@@ -2,17 +2,11 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Small app-wide tweaks */
-.card { @apply bg-white rounded-2xl shadow-md border border-slate-200; }
-.btn { @apply inline-flex items-center justify-center rounded-xl px-3 py-2 font-semibold bg-slate-100 hover:bg-slate-200 cursor-pointer; }
+:root { color-scheme: light; }
+.dark { color-scheme: dark; }
+.card { @apply bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-soft; }
+.btn { @apply inline-flex items-center gap-2 rounded-xl px-3 py-2 font-semibold bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700; }
 .btn-primary { @apply bg-blue-600 text-white hover:bg-blue-700; }
-.input, .select, .textarea { @apply w-full rounded-xl border border-slate-300 bg-white px-3 py-2; }
-.badge { @apply inline-block text-xs px-2 py-0.5 rounded-full bg-slate-200; }
-.badge-soon { @apply bg-yellow-200; }
-.badge-overdue { @apply bg-red-200; }
-.muted { @apply text-slate-500 text-sm; }
-.container-narrow { @apply max-w-5xl mx-auto px-4; }
-.header { @apply flex items-center justify-between gap-4 mb-4; }
-.table { @apply w-full text-left border-collapse; }
-.table th { @apply sticky top-0 z-10 text-xs text-slate-600 bg-slate-50; }
-.table th, .table td { @apply border-b border-slate-100 p-3 align-top; }
+.input, .select, .textarea { @apply w-full rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-2; }
+.badge { @apply inline-flex items-center text-xs px-2 py-0.5 rounded-full bg-slate-200 dark:bg-slate-700; }
+.skeleton { @apply animate-pulse bg-slate-200 dark:bg-slate-800 rounded-lg; }
