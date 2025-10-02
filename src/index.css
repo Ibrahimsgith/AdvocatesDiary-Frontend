@@ -4,6 +4,7 @@
 
 :root { color-scheme: light; }
 .dark { color-scheme: dark; }
+
 .card { @apply bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-soft; }
 .btn { @apply inline-flex items-center gap-2 rounded-xl px-3 py-2 font-semibold bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700; }
 .btn-primary { @apply bg-blue-600 text-white hover:bg-blue-700; }

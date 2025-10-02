@@ -17,6 +17,16 @@ const schema = z.object({
   tags: z.string().optional(),
 })
 
+function Field({ label, error, col='md:col-span-6', children }){
+  return (
+    <div className={`col-span-12 ${col}`}>
+      <label className="block text-sm text-slate-600 dark:text-slate-300 mb-1">{label}</label>
+      {children}
+      {error && <div className="text-xs text-red-600 mt-1">{error}</div>}
+    </div>
+  )
+}
+
 export default function MatterForm(){
   const { id } = useParams()
   const nav = useNavigate()
@@ -46,8 +56,7 @@ export default function MatterForm(){
       toast.success('Matter updated'); nav('/matters')
     } else {
       const newId = await addCase(payload)
-      toast.success('Matter added')
-      nav(`/matters/${newId}`)
+      toast.success('Matter added'); nav(`/matters/${newId}`)
     }
   }
 
@@ -76,15 +85,5 @@ export default function MatterForm(){
         <button className="btn" type="button" onClick={()=>nav(-1)}>Cancel</button>
       </div>
     </form>
-  )
-}
-
-function Field({ label, error, col='md:col-span-6', children }){
-  return (
-    <div className={`col-span-12 ${col}`}>
-      <label className="block text-sm text-slate-600 dark:text-slate-300 mb-1">{label}</label>
-      {children}
-      {error && <div className="text-xs text-red-600 mt-1">{error}</div>}
-    </div>
   )
 }

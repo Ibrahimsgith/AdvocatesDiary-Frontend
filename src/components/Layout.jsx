@@ -1,12 +1,14 @@
 import { useEffect, useState } from 'react'
 import { NavLink, useNavigate } from 'react-router-dom'
-import { Menu, Sun, Moon, LogOut, Search, CaseSensitive } from 'lucide-react'
+import { Menu, Sun, Moon, Search } from 'lucide-react'
 import clsx from 'clsx'
 import { Toaster } from 'react-hot-toast'
 
 function useTheme() {
-  const [dark, setDark] = useState(() => localStorage.getItem('theme') === 'dark' ||
-    (localStorage.getItem('theme') === null && window.matchMedia('(prefers-color-scheme: dark)').matches))
+  const [dark, setDark] = useState(() =>
+    localStorage.getItem('theme') === 'dark' ||
+    (localStorage.getItem('theme') === null && window.matchMedia('(prefers-color-scheme: dark)').matches)
+  )
   useEffect(() => {
     document.documentElement.classList.toggle('dark', dark)
     localStorage.setItem('theme', dark ? 'dark' : 'light')

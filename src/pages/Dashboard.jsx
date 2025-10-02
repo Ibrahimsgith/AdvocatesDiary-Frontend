@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useMemo, useState } from 'react'
 import { useCases } from '../store/cases'
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts'
 
@@ -14,13 +14,17 @@ function StatCard({ title, value, hint }) {
 
 export default function Dashboard() {
   const { cases } = useCases()
-  const [loading, setLoading] = useState(false) // flip if you hydrate from API
+  const [loading] = useState(false)
 
   const stats = useMemo(() => {
     const total = cases.length
     const today = (() => {
       const t = new Date(); t.setHours(0,0,0,0)
-      return cases.filter(c => c.nextDate && new Date(c.nextDate+'T00:00:00').setHours(0,0,0,0) === t.getTime()).length
+      return cases.filter(c => {
+        if(!c.nextDate) return false
+        const d = new Date(c.nextDate + 'T00:00:00'); d.setHours(0,0,0,0)
+        return d.getTime() === t.getTime()
+      }).length
     })()
     const upcoming = cases.filter(c => c.nextDate && new Date(c.nextDate) >= new Date()).length
     const overdue = cases.filter(c => c.nextDate && new Date(c.nextDate) < new Date(new Date().toDateString())).length
@@ -28,11 +32,11 @@ export default function Dashboard() {
   }, [cases])
 
   const trend = useMemo(() => {
-    // simple fake trend: group by month of nextDate
     const map = new Map()
     for (const c of cases) {
       if(!c.nextDate) continue
-      const d = new Date(c.nextDate); const key = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`
+      const d = new Date(c.nextDate)
+      const key = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`
       map.set(key, (map.get(key) ?? 0) + 1)
     }
     return [...map.entries()].sort(([a],[b])=>a.localeCompare(b)).map(([k,v])=>({ month:k, hearings:v }))
