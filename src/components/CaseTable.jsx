@@ -20,6 +20,15 @@ export default function CaseTable({items}){
   return (
     <div className="max-h-[60vh] overflow-auto">
       <table className="table">
+        <table className="w-full text-left border-collapse">
+  <thead className="sticky top-0 z-10 text-xs text-slate-600 bg-slate-50 dark:bg-slate-900">
+    {/* ... */}
+  </thead>
+  <tbody className="[&>tr:nth-child(even)]:bg-slate-50/50 dark:[&>tr:nth-child(even)]:bg-slate-900/40 [&>tr:hover]:bg-blue-50/60 dark:[&>tr:hover]:bg-slate-800/60">
+    {/* rows */}
+  </tbody>
+</table>
+
         <thead>
           <tr>
             <th className="w-40">Case No.</th>
