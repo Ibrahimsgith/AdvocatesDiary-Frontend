@@ -1,160 +1,147 @@
-import { useMemo, useState } from 'react'
-import { Link, useLocation } from 'react-router-dom'
+import { useState, useMemo } from 'react'
+import { useNavigate } from 'react-router-dom'
+import Drawer from '../components/Drawer'
+import CaseDetails from '../components/CaseDetails'
+import DataTable from '../components/DataTable' // Assuming a generic DataTable component
 import { useCases } from '../store/cases'
-import DataTable from '../components/DataTable'
-import { format } from './_utils_date' // helper below
-import { Download } from 'lucide-react'
+import { format } from '../lib/_utils_date' // Imported date formatter
+import { Edit3, PlusCircle } from 'lucide-react'
 
-function useQuery() {
-  const { search } = useLocation()
-  return useMemo(() => new URLSearchParams(search), [search])
-}
 
-function statusOf(nextDate) {
-  if (!nextDate) return 'none'
-  const today = new Date(); today.setHours(0,0,0,0)
-  const nd = new Date(nextDate + 'T00:00:00'); nd.setHours(0,0,0,0)
-  if (nd.getTime() === today.getTime()) return 'today'
-  if (nd < today) return 'overdue'
-  const diffDays = (nd - today) / (1000*60*60*24)
-  return diffDays <= 7 ? 'soon' : 'upcoming'
-}
-
-export default function Matters(){
-  const { cases } = useCases()
-  const q = useQuery()
-  const qText = q.get('search') || ''
-
-  // table state (sorting, pagination, search)
-  const [tblState, setTblState] = useState({
-    sorting: [],
-    globalFilter: qText,
-    pageIndex: 0,
-    pageSize: 20,
+export default function Matters() {
+  const { cases: rows } = useCases() // Fetches data from Zustand store
+  const navigate = useNavigate()
+  
+  // State for Table and Drawer
+  const [drawerOpen, setDrawerOpen] = useState(false)
+  const [selected, setSelected] = useState(null)
+  const [tblState, setTblState] = useState({ 
+    sorting: [], 
+    globalFilter: '', 
+    pageIndex: 0, 
+    pageSize: 10 
   })
-  const [statusFilter, setStatusFilter] = useState('all')
 
-  const rows = useMemo(() => {
-    let list = cases.map(m => ({
-      ...m,
-      status: statusOf(m.nextDate),
-      nextDateFmt: m.nextDate ? format(m.nextDate) : '—',
-      tagsText: (m.tags||[]).map(t => `#${t}`).join(' '),
-    }))
-    if (statusFilter !== 'all') {
-      list = list.filter(r => r.status === statusFilter)
-    }
-    return list
-  }, [cases, statusFilter])
+  // When user clicks a row:
+  function onRowClick(row) {
+    setSelected(row.original)
+    setDrawerOpen(true)
+  }
+  
+  // Utility function to determine status badges
+  const getStatusBadge = (d) => {
+    if (!d) return null
+    const date = new Date(d + 'T00:00:00')
+    const today = new Date(); today.setHours(0,0,0,0)
+    const diff = (date - today) / (1000 * 60 * 60 * 24)
 
+    if (diff < 0) return <span className="badge badge-overdue">Overdue</span>
+    if (diff === 0) return <span className="badge bg-brand-600 text-white">Today</span> // Custom badge for Today
+    if (diff <= 7) return <span className="badge badge-soon">Soon</span>
+    return null
+  }
+
+  // Define columns for the DataTable
   const columns = useMemo(()=>[
     {
       header: 'Case No.',
       accessorKey: 'caseNo',
       cell: ({ row }) => (
-        <div>
+        <button
+          className="text-left hover:underline text-brand-600 dark:text-brand-300"
+          onClick={() => onRowClick(row)}
+          title="Open details"
+        >
           <div className="font-semibold">{row.original.caseNo}</div>
-          <div className="text-xs text-slate-500">{row.original.tagsText}</div>
-        </div>
+          <div className="text-xs text-slate-500 dark:text-slate-400">{(row.original.tags||[]).map(t=>`#${t}`).join(' ')}</div>
+        </button>
       ),
     },
-    {
-      header: 'Client',
-      accessorKey: 'client',
-      cell: ({ row }) => (
-        <div>
-          <div>{row.original.client}</div>
-          {row.original.opposite && <div className="text-xs text-slate-500">{row.original.opposite}</div>}
-        </div>
-      ),
-    },
-    {
-      header: 'Next Hearing',
+    { header: 'Client / Opposite', accessorKey: 'client', cell: ({ row }) => (
+      <div>{row.original.client} <span className="muted">{row.original.opposite && `vs ${row.original.opposite}`}</span></div>
+    )},
+    { 
+      header: 'Next Hearing', 
       accessorKey: 'nextDate',
-      sortingFn: 'alphanumeric',
       cell: ({ row }) => (
         <div>
-          {row.original.nextDateFmt}
-          <div className="mt-1">
-            {row.original.status === 'overdue' && <span className="badge bg-red-200">Overdue</span>}
-            {row.original.status === 'today'   && <span className="badge">Today</span>}
-            {row.original.status === 'soon'    && <span className="badge bg-yellow-200">Soon</span>}
-          </div>
+          <div className="font-medium">{format(row.original.nextDate)}</div>
+          {getStatusBadge(row.original.nextDate)}
         </div>
-      ),
+      )
     },
     { header: 'Court / Stage', accessorKey: 'court', cell: ({ row }) => (
-        <div>
-          <div>{row.original.court || ''}</div>
-          <div className="text-xs text-slate-500">{row.original.stage || ''}</div>
-        </div>
-      )
-    },
-    { header: 'Notes', accessorKey: 'notes' },
+      <div>{row.original.court} <span className="muted">{row.original.stage}</span></div>
+    )},
     {
-      header: 'Actions',
-      enableSorting: false,
-      cell: ({ row }) => (
-        <Link className="btn" to={`/matters/${row.original.id}`}>Edit</Link>
-      )
-    },
+        header: 'Actions',
+        id: 'actions',
+        enableSorting: false,
+        cell: ({ row }) => (
+            <button 
+                className="btn text-sm" 
+                onClick={() => navigate(`/matters/${row.original.id}`)}
+            >
+                <Edit3 size={16} /> Edit
+            </button>
+        )
+    }
   ], [])
 
   return (
-    <div className="space-y-3">
-      <div className="grid grid-cols-12 gap-3">
-        <div className="col-span-12 md:col-span-5">
-          <input
-            className="input"
-            placeholder="Search case no., client, court, notes…"
-            value={tblState.globalFilter ?? ''}
-            onChange={e => setTblState(s => ({ ...s, globalFilter: e.target.value }))}
-          />
-        </div>
-        <div className="col-span-6 md:col-span-3">
-          <select className="select" value={statusFilter} onChange={e=>setStatusFilter(e.target.value)}>
-            <option value="all">All</option>
-            <option value="today">Today</option>
-            <option value="soon">Upcoming (≤ 7 days)</option>
-            <option value="upcoming">Later</option>
-            <option value="overdue">Overdue</option>
-          </select>
-        </div>
-        <div className="col-span-6 md:col-span-4 flex gap-2">
-          <Link className="btn btn-primary grow text-center" to="/matters/new">+ Add</Link>
-          <button className="btn grow inline-flex items-center gap-1" onClick={()=>exportJson(cases)}>
-            <Download className="h-4 w-4" /> Export
-          </button>
-          <label className="btn grow text-center cursor-pointer">
-            Import<input type="file" accept="application/json" hidden onChange={onImport} />
-          </label>
-        </div>
+    <div className="space-y-4">
+      
+      {/* Toolbar with Search and Add Matter Button */}
+      <div className="flex justify-between items-center p-2 card/header">
+        <input 
+            type="text"
+            placeholder="Filter all columns..."
+            className="input w-64"
+            value={tblState.globalFilter}
+            onChange={e => setTblState(s => ({ ...s, globalFilter: e.target.value, pageIndex: 0 }))}
+        />
+        <button
+            className="btn btn-primary"
+            onClick={() => navigate('/matters/new')} // FIX: Navigation to create form
+        >
+            <PlusCircle size={18} /> Add Matter
+        </button>
       </div>
 
+      {/* DataTable component */}
       <DataTable
         columns={columns}
         data={rows}
         state={tblState}
-        onState={(updater) => setTblState(prev => typeof updater === 'function' ? updater(prev) : updater)}
+        onState={setTblState}
       />
+
+      {/* Floating Case Details Drawer */}
+      <Drawer
+        open={drawerOpen}
+        onClose={() => setDrawerOpen(false)}
+        title="Case Details"
+        width={480}
+        footer={
+          selected && (
+            <div className="flex gap-2 justify-end">
+              <button className="btn" onClick={()=>{/* optional: print/export */}}>Export</button>
+              <button 
+                className="btn btn-primary" 
+                onClick={() => { navigate(`/matters/${selected.id}`) }} // FIX: Navigation to edit form
+              >
+                Edit
+              </button>
+            </div>
+          )
+        }
+      >
+        <CaseDetails
+          data={selected}
+          onEdit={()=>{ navigate(`/matters/${selected.id}`) }} // Pass navigate function
+          onDelete={()=>{/* confirm + delete flow */}}
+        />
+      </Drawer>
     </div>
   )
-}
-
-function onImport(e){
-  const file = e.target.files?.[0]; if(!file) return;
-  file.text().then(text=>{
-    try {
-      const data = JSON.parse(text)
-      if(!Array.isArray(data)) throw new Error()
-      localStorage.setItem('advocate-diary:v1', JSON.stringify(data)); window.location.reload()
-    } catch { alert('Invalid file') }
-  })
-}
-
-// lightweight export (same as your storage util; duplicated to keep this page self-contained)
-function exportJson(arr){
-  const blob = new Blob([JSON.stringify(arr, null, 2)], { type: 'application/json' })
-  const a = document.createElement('a'); a.href = URL.createObjectURL(blob)
-  a.download = 'advocate-diary-backup.json'; a.click(); URL.revokeObjectURL(a.href)
 }

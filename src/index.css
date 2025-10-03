@@ -2,12 +2,94 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ---------------------------------------------------- */
+/* Global Theme Settings (Dark Mode) */
+/* ---------------------------------------------------- */
+
+/* Tell browsers which color scheme to use for form controls, etc. */
 :root { color-scheme: light; }
 .dark { color-scheme: dark; }
 
-.card { @apply bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-soft; }
-.btn { @apply inline-flex items-center gap-2 rounded-xl px-3 py-2 font-semibold bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700; }
-.btn-primary { @apply bg-blue-600 text-white hover:bg-blue-700; }
-.input, .select, .textarea { @apply w-full rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-2; }
-.badge { @apply inline-flex items-center text-xs px-2 py-0.5 rounded-full bg-slate-200 dark:bg-slate-700; }
-.skeleton { @apply animate-pulse bg-slate-200 dark:bg-slate-800 rounded-lg; }
+/* Sets the attractive animated gradient background for the body */
+body {
+  @apply bg-gradient-to-br 
+    from-white via-slate-50 to-slate-100 
+    dark:from-slate-950 dark:via-slate-900 dark:to-slate-950 
+    text-slate-900 dark:text-slate-100;
+  
+  /* Adds subtle animated radial gradient blobs */
+  background-image:
+    radial-gradient(72rem 42rem at 10% -10%, rgba(79,70,229,.08), transparent),
+    radial-gradient(56rem 32rem at 110% 10%, rgba(14,165,233,.06), transparent);
+}
+
+/* ---------------------------------------------------- */
+/* Reusable Components */
+/* ---------------------------------------------------- */
+
+/* The Card component (e.g., for Dashboard, Layout content) */
+.card { 
+  @apply bg-white/80 dark:bg-slate-900/70 
+    backdrop-blur 
+    rounded-2xl 
+    border border-slate-200/70 dark:border-slate-800/60 
+    shadow-soft; /* Uses the custom 'shadow-soft' */
+}
+
+/* Default Button Style */
+.btn { 
+  @apply inline-flex items-center gap-2 
+    rounded-xl 
+    px-3 py-2 
+    font-semibold 
+    bg-slate-100/80 dark:bg-slate-800/70 
+    hover:bg-slate-200/80 dark:hover:bg-slate-700/70 
+    transition duration-150; 
+}
+
+/* Primary Button Style (for 'Add Matter', 'Update', etc.) */
+.btn-primary { 
+  @apply bg-brand-600 text-white hover:bg-brand-700 shadow-glow; /* Uses custom 'brand-600' and 'shadow-glow' */
+}
+
+/* Form Inputs, Selects, and Textareas */
+.input, .select, .textarea { 
+  @apply w-full 
+    rounded-lg 
+    border border-slate-300 dark:border-slate-700 
+    bg-white dark:bg-slate-800 
+    text-slate-900 dark:text-slate-100 
+    p-2 
+    focus:ring-brand-600 focus:border-brand-600 
+    transition duration-150; 
+}
+
+/* Status Badges */
+.badge { 
+  @apply inline-block 
+    text-xs font-medium uppercase 
+    px-2 py-0.5 rounded-full 
+    bg-brand-50 text-brand-700 
+    dark:bg-brand-900/50 dark:text-brand-100; 
+}
+.badge-overdue { 
+  @apply bg-red-100 text-red-700 dark:bg-red-900/50 dark:text-red-300; 
+}
+.badge-soon { 
+  @apply bg-amber-100 text-amber-700 dark:bg-amber-900/50 dark:text-amber-300; 
+}
+
+/* Text and Utility Classes */
+.muted { 
+  @apply text-xs text-slate-500 dark:text-slate-400; 
+}
+.kbd { 
+  @apply border border-slate-300 dark:border-slate-700 
+    bg-slate-100 dark:bg-slate-800 
+    rounded-md px-1 py-0.5 text-xs; 
+}
+
+/* Sidebar Active Link Style (nav-active is defined separately for better control) */
+.nav-active {
+  @apply bg-brand-600/90 text-white dark:bg-brand-700/90;
+}
