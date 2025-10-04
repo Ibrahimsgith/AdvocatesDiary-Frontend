@@ -3,7 +3,7 @@ import { useEffect } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useNavigate, useParams } from 'react-router-dom'
-import { useCases } from '../store/cases'
+import { useCases, useHydrateCases } from '../store/cases'
 import toast from 'react-hot-toast'
 
 // Zod schema for validation
@@ -39,6 +39,7 @@ const btnDefaultClasses = "btn"
 export default function MatterForm(){
   const { id } = useParams()
   const nav = useNavigate()
+  const hydrated = useHydrateCases()
   const { cases, addCase, updateCase, removeCase } = useCases()
   const current = cases.find(c=>c.id===id) || null
 
@@ -72,6 +73,15 @@ export default function MatterForm(){
       const newId = await addCase(payload)
       toast.success('Matter added'); nav(`/matters/${newId}`)
     }
+  }
+
+  if(!hydrated){
+    return (
+      <div className="p-6">
+        <h2 className="text-2xl font-bold mb-6">Loading matter…</h2>
+        <p className="text-sm text-slate-500 dark:text-slate-400">Please hold on while we fetch your cases.</p>
+      </div>
+    )
   }
 
   return (

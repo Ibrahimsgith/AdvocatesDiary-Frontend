@@ -1,3 +1,4 @@
+import { useEffect } from 'react'
 import { create } from 'zustand'
 import { load, save } from '../lib/storage'
 import { USE_API } from '../config'
@@ -41,3 +42,15 @@ export const useCases = create((set, get) => ({
     }
   }
 }))
+
+export function useHydrateCases(){
+  const hydrated = useCases(state => state.hydrated)
+  const hydrate = useCases(state => state.hydrate)
+
+  useEffect(() => {
+    if(!USE_API || hydrated) return
+    hydrate()
+  }, [hydrate, hydrated])
+
+  return USE_API ? hydrated : true
+}

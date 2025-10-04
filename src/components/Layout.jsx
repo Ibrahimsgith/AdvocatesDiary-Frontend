@@ -3,6 +3,7 @@ import { NavLink, useNavigate } from 'react-router-dom'
 import { Menu, Sun, Moon, Search } from 'lucide-react'
 import clsx from 'clsx'
 import { Toaster } from 'react-hot-toast'
+import { useHydrateCases } from '../store/cases'
 
 function useTheme() {
   const [dark, setDark] = useState(() =>
@@ -20,6 +21,7 @@ export default function Layout({ children }) {
   const [open, setOpen] = useState(true)
   const navigate = useNavigate()
   const { dark, toggle } = useTheme()
+  const hydrated = useHydrateCases()
 
   const linkClass = ({ isActive }) =>
     clsx('flex items-center gap-2 rounded-xl px-3 py-2 text-sm',
@@ -56,13 +58,25 @@ export default function Layout({ children }) {
           <nav className="card p-3 space-y-2">
             <NavLink to="/" className={linkClass}>🏠 Dashboard</NavLink>
             <NavLink to="/matters" className={linkClass}>📁 Matters</NavLink>
-            <button className="btn btn-primary w-full" onClick={() => navigate('/matters/new')}>+ New Matter</button>
+            <button
+              className="btn btn-primary w-full"
+              onClick={() => navigate('/matters/new')}
+              disabled={!hydrated}
+            >
+              + New Matter
+            </button>
           </nav>
           <div className="text-xs text-slate-500 dark:text-slate-400 mt-3 px-1">Local-first • API-backed</div>
         </aside>
 
         <main className={clsx('col-span-12', open ? 'md:col-span-9 lg:col-span-10' : 'md:col-span-12')}>
-          <div className="card p-4">{children}</div>
+          <div className="card p-4">
+            {hydrated ? children : (
+              <div className="py-24 flex flex-col items-center justify-center text-sm text-slate-500 dark:text-slate-400">
+                <span className="animate-pulse">Loading matters…</span>
+              </div>
+            )}
+          </div>
         </main>
       </div>
     </div>
