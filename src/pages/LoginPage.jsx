@@ -21,7 +21,6 @@ export default function LoginPage({ onSubmit }) {
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-100 via-white to-slate-100">
       <div className="max-w-md w-full bg-white/90 backdrop-blur rounded-3xl border border-slate-200 shadow-lg p-8 space-y-6">
         <header className="space-y-2 text-center">
-          <h1 className="text-2xl font-semibold text-slate-900">Pasha Law Senate</h1>
           <h1 className="text-2xl font-semibold text-slate-900">Sterling &amp; Co. Law Partners</h1>
           <p className="text-sm text-slate-500">Secure portal for case tracking, client management, and firm operations.</p>
         </header>
@@ -34,7 +33,6 @@ export default function LoginPage({ onSubmit }) {
               name="email"
               type="email"
               className="input"
-              placeholder="you@pashalawsenate.com"
               placeholder="you@sterlinglaw.com"
               value={form.email}
               onChange={handleChange}
