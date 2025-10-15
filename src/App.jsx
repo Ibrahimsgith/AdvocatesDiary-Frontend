@@ -1,19 +1,27 @@
-import { Routes, Route } from 'react-router-dom'
-import Layout from './components/Layout.jsx'
-import Dashboard from './pages/Dashboard.jsx'
-import Matters from './pages/Matters.jsx'
-import MatterForm from './pages/MatterForm.jsx'
+import { Navigate, Route, Routes } from 'react-router-dom'
+import ShellLayout from './components/ShellLayout.jsx'
+import DashboardPage from './pages/DashboardPage.jsx'
+import CasesPage from './pages/CasesPage.jsx'
+import ClientsPage from './pages/ClientsPage.jsx'
+import UpcomingCasesPage from './pages/UpcomingCasesPage.jsx'
+import ResourcesPage from './pages/ResourcesPage.jsx'
 
-export default function App(){
+export default function App() {
   return (
-    <Layout>
-      <Routes>
-        <Route path="/" element={<Dashboard />} />
-        <Route path="/matters" element={<Matters />} />
-        <Route path="/matters/new" element={<MatterForm />} />
-        <Route path="/matters/:id" element={<MatterForm />} />
-        <Route path="*" element={<div className="p-4">Not Found</div>} />
-      </Routes>
-    </Layout>
+    <Routes>
+      <Route path="/" element={<ShellLayout />}>
+        <Route index element={<Navigate to="/dashboard" replace />} />
+        <Route path="dashboard" element={<DashboardPage />} />
+        <Route path="cases" element={<CasesPage />} />
+        <Route path="clients" element={<ClientsPage />} />
+        <Route path="upcoming" element={<UpcomingCasesPage />} />
+        <Route path="resources" element={<ResourcesPage />} />
+      </Route>
+
+      <Route
+        path="*"
+        element={<Navigate to="/dashboard" replace />}
+      />
+    </Routes>
   )
 }
