@@ -18,6 +18,8 @@ export default function ShellLayout() {
   const isLoading = usePortalData((state) => state.isLoading)
   const error = usePortalData((state) => state.error)
   const clearError = usePortalData((state) => state.clearError)
+  const notice = usePortalData((state) => state.notice)
+  const clearNotice = usePortalData((state) => state.clearNotice)
 
   useEffect(() => {
     if (!hasLoaded && !isLoading) {
@@ -108,6 +110,14 @@ export default function ShellLayout() {
           <div className="rounded-2xl border border-red-200 bg-red-50/80 px-4 py-3 text-sm text-red-700 flex items-start justify-between gap-4">
             <span>{error}</span>
             <button type="button" className="text-xs font-medium underline" onClick={clearError}>
+              Dismiss
+            </button>
+          </div>
+        )}
+        {notice && (
+          <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 flex items-start justify-between gap-4">
+            <span>{notice}</span>
+            <button type="button" className="text-xs font-medium underline" onClick={clearNotice}>
               Dismiss
             </button>
           </div>
