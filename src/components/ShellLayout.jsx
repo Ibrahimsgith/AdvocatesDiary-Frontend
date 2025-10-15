@@ -26,6 +26,7 @@ export default function ShellLayout({ onLogout }) {
               {mobileOpen ? <X size={18} /> : <Menu size={18} />}
             </button>
             <Link to="/dashboard" className="text-lg font-semibold tracking-tight">
+              Pasha Law Senate
               Sterling &amp; Co. Law Partners
             </Link>
           </div>
