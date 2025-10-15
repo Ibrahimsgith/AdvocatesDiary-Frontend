@@ -3,12 +3,13 @@ import { useNavigate } from 'react-router-dom'
 import Drawer from '../components/Drawer'
 import CaseDetails from '../components/CaseDetails'
 import DataTable from '../components/DataTable' // Assuming a generic DataTable component
-import { useCases } from '../store/cases'
+import { useCases, useHydrateCases } from '../store/cases'
 import { format } from '../lib/_utils_date' // Imported date formatter
 import { Edit3, PlusCircle } from 'lucide-react'
 
 
 export default function Matters() {
+  const hydrated = useHydrateCases()
   const { cases: rows } = useCases() // Fetches data from Zustand store
   const navigate = useNavigate()
   
@@ -87,6 +88,14 @@ export default function Matters() {
         )
     }
   ], [])
+
+  if(!hydrated){
+    return (
+      <div className="py-24 flex flex-col items-center justify-center text-sm text-slate-500 dark:text-slate-400">
+        <span className="animate-pulse">Loading matters…</span>
+      </div>
+    )
+  }
 
   return (
     <div className="space-y-4">
