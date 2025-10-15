@@ -27,7 +27,6 @@ export default function ShellLayout({ onLogout }) {
             </button>
             <Link to="/dashboard" className="text-lg font-semibold tracking-tight">
               Pasha Law Senate
-              Sterling &amp; Co. Law Partners
             </Link>
           </div>
           <div className="hidden md:flex items-center gap-6 text-sm font-medium">

@@ -2,71 +2,117 @@ import { create } from 'zustand'
 
 const STORAGE_KEY = 'pasha-law-senate:data'
 
-const defaultData = {
-  stats: {
-    activeMatters: 0,
-    hearingsThisWeek: 0,
-    filingsPending: 0,
-    teamUtilisation: 0,
-  },
+const baseStats = {
+  activeMatters: 0,
+  hearingsThisWeek: 0,
+  filingsPending: 0,
+  teamUtilisation: 0,
+}
+
+const createDefaultData = () => ({
+  stats: { ...baseStats },
   cases: [],
   clients: [],
   tasks: [],
   team: [],
   resources: [],
   supportDesks: [],
+})
+
+const toFiniteNumber = (value, fallback) => {
+  const number = Number(value)
+  return Number.isFinite(number) ? number : fallback
 }
 
-const canUseStorage = () => typeof window !== 'undefined' && typeof window.localStorage !== 'undefined'
+const toArray = (value) => {
+  if (!Array.isArray(value)) return []
+  return value.filter(Boolean).map((item) => ({ ...(typeof item === 'object' && item !== null ? item : {}) }))
+}
+
+const sanitiseData = (value) => {
+  const defaults = createDefaultData()
+  if (!value || typeof value !== 'object') return defaults
+
+  return {
+    ...defaults,
+    ...value,
+    stats: {
+      ...defaults.stats,
+      ...Object.fromEntries(
+        Object.entries(value.stats || {}).map(([key, number]) => [key, toFiniteNumber(number, defaults.stats[key] ?? 0)])
+      ),
+    },
+    cases: toArray(value.cases),
+    clients: toArray(value.clients),
+    tasks: toArray(value.tasks),
+    team: toArray(value.team),
+    resources: toArray(value.resources),
+    supportDesks: toArray(value.supportDesks),
+  }
+}
+
+const getStorage = () => {
+  if (typeof window === 'undefined') return null
+  try {
+    const { localStorage } = window
+    const probeKey = '__pls_probe__'
+    localStorage.setItem(probeKey, 'ok')
+    localStorage.removeItem(probeKey)
+    return localStorage
+  } catch (error) {
+    console.warn('Local storage unavailable, running in memory-only mode.', error)
+    return null
+  }
+}
+
+const storage = getStorage()
 
 const readStorage = () => {
-  if (!canUseStorage()) return defaultData
+  if (!storage) return createDefaultData()
   try {
-    const raw = window.localStorage.getItem(STORAGE_KEY)
-    if (!raw) return defaultData
-    const parsed = JSON.parse(raw)
-    return {
-      ...defaultData,
-      ...parsed,
-      stats: { ...defaultData.stats, ...(parsed?.stats || {}) },
-    }
+    const raw = storage.getItem(STORAGE_KEY)
+    if (!raw) return createDefaultData()
+    return sanitiseData(JSON.parse(raw))
   } catch (error) {
     console.warn('Unable to read portal data from storage', error)
-    return defaultData
+    return createDefaultData()
   }
 }
 
 const writeStorage = (data) => {
-  if (!canUseStorage()) return
+  if (!storage) return
   try {
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(data))
+    storage.setItem(STORAGE_KEY, JSON.stringify(sanitiseData(data)))
   } catch (error) {
     console.warn('Unable to persist portal data', error)
   }
 }
 
 const newId = () => {
-  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
-    return crypto.randomUUID()
+  if (globalThis?.crypto?.randomUUID) {
+    return globalThis.crypto.randomUUID()
   }
   return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`
 }
 
 const sync = (data) => {
-  writeStorage(data)
-  return { data }
+  const normalised = sanitiseData(data)
+  writeStorage(normalised)
+  return { data: normalised }
 }
 
 export const usePortalData = create((set, get) => ({
   data: readStorage(),
-  reset: () => set(() => sync(defaultData)),
+  reset: () => set(() => sync(createDefaultData())),
   updateStats: (patch) => {
     const current = get().data
     const next = {
       ...current,
       stats: {
         ...current.stats,
-        ...patch,
+        ...Object.fromEntries(
+          Object.entries(patch).map(([key, number]) => [key, toFiniteNumber(number, current.stats[key] ?? 0)])
+        ),
       },
     }
     set(() => sync(next))
