@@ -1,16 +1,13 @@
 import { create } from 'zustand'
-
-const STORAGE_KEY = 'pasha-law-senate:data'
-
-const baseStats = {
-  activeMatters: 0,
-  hearingsThisWeek: 0,
-  filingsPending: 0,
-  teamUtilisation: 0,
-}
+import { api } from '../lib/api'
 
 const createDefaultData = () => ({
-  stats: { ...baseStats },
+  stats: {
+    activeMatters: 0,
+    hearingsThisWeek: 0,
+    filingsPending: 0,
+    teamUtilisation: 0,
+  },
   cases: [],
   clients: [],
   tasks: [],
@@ -19,234 +16,206 @@ const createDefaultData = () => ({
   supportDesks: [],
 })
 
-const toFiniteNumber = (value, fallback) => {
-  const number = Number(value)
-  return Number.isFinite(number) ? number : fallback
-}
-
-const toArray = (value) => {
-  if (!Array.isArray(value)) return []
-  return value.filter(Boolean).map((item) => ({ ...(typeof item === 'object' && item !== null ? item : {}) }))
-}
-
-const sanitiseData = (value) => {
-  const defaults = createDefaultData()
-  if (!value || typeof value !== 'object') return defaults
-
-  return {
-    ...defaults,
-    ...value,
-    stats: {
-      ...defaults.stats,
-      ...Object.fromEntries(
-        Object.entries(value.stats || {}).map(([key, number]) => [key, toFiniteNumber(number, defaults.stats[key] ?? 0)])
-      ),
-    },
-    cases: toArray(value.cases),
-    clients: toArray(value.clients),
-    tasks: toArray(value.tasks),
-    team: toArray(value.team),
-    resources: toArray(value.resources),
-    supportDesks: toArray(value.supportDesks),
-  }
-}
-
-const getStorage = () => {
-  if (typeof window === 'undefined') return null
+const withErrorHandling = async (operation, onError) => {
   try {
-    const { localStorage } = window
-    const probeKey = '__pls_probe__'
-    localStorage.setItem(probeKey, 'ok')
-    localStorage.removeItem(probeKey)
-    return localStorage
+    return await operation()
   } catch (error) {
-    console.warn('Local storage unavailable, running in memory-only mode.', error)
-    return null
+    onError?.(error)
+    throw error
   }
-}
-
-const storage = getStorage()
-
-const readStorage = () => {
-  if (!storage) return createDefaultData()
-  try {
-    const raw = storage.getItem(STORAGE_KEY)
-    if (!raw) return createDefaultData()
-    return sanitiseData(JSON.parse(raw))
-  } catch (error) {
-    console.warn('Unable to read portal data from storage', error)
-    return createDefaultData()
-  }
-}
-
-const writeStorage = (data) => {
-  if (!storage) return
-  try {
-    storage.setItem(STORAGE_KEY, JSON.stringify(sanitiseData(data)))
-  } catch (error) {
-    console.warn('Unable to persist portal data', error)
-  }
-}
-
-const newId = () => {
-  if (globalThis?.crypto?.randomUUID) {
-    return globalThis.crypto.randomUUID()
-  }
-  return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`
-}
-
-const sync = (data) => {
-  const normalised = sanitiseData(data)
-  writeStorage(normalised)
-  return { data: normalised }
 }
 
 export const usePortalData = create((set, get) => ({
-  data: readStorage(),
-  reset: () => set(() => sync(createDefaultData())),
-  updateStats: (patch) => {
-    const current = get().data
-    const next = {
-      ...current,
-      stats: {
-        ...current.stats,
-        ...Object.fromEntries(
-          Object.entries(patch).map(([key, number]) => [key, toFiniteNumber(number, current.stats[key] ?? 0)])
-        ),
+  data: createDefaultData(),
+  isLoading: false,
+  hasLoaded: false,
+  error: null,
+  clearError() {
+    set({ error: null })
+  },
+  async load() {
+    if (get().isLoading) return
+    set({ isLoading: true, error: null })
+    try {
+      const data = await api.getPortal()
+      set({ data, isLoading: false, hasLoaded: true, error: null })
+    } catch (error) {
+      set({ error: error.message || 'Unable to load portal data.', isLoading: false, hasLoaded: false })
+      throw error
+    }
+  },
+  async refresh() {
+    return get().load()
+  },
+  async reset() {
+    set({ data: createDefaultData(), hasLoaded: false, error: null })
+  },
+  async updateStats(patch) {
+    return withErrorHandling(
+      async () => {
+        set({ error: null })
+        const response = await api.updateStats(patch)
+        set((state) => ({
+          data: {
+            ...state.data,
+            stats: { ...state.data.stats, ...response.stats },
+          },
+        }))
       },
-    }
-    set(() => sync(next))
+      (error) => set({ error: error.message || 'Unable to update metrics.' })
+    )
   },
-  addCase: (values) => {
-    const current = get().data
-    const newCase = {
-      id: newId(),
-      createdAt: new Date().toISOString(),
-      ...values,
-    }
-    const next = {
-      ...current,
-      cases: [...current.cases, newCase],
-    }
-    set(() => sync(next))
-    return newCase.id
+  async addCase(values) {
+    return withErrorHandling(
+      async () => {
+        set({ error: null })
+        const created = await api.createCase(values)
+        set((state) => ({
+          data: { ...state.data, cases: [created, ...state.data.cases] },
+        }))
+        return created.id
+      },
+      (error) => set({ error: error.message || 'Unable to add case.' })
+    )
   },
-  removeCase: (id) => {
-    const current = get().data
-    const next = {
-      ...current,
-      cases: current.cases.filter((item) => item.id !== id),
-    }
-    set(() => sync(next))
+  async removeCase(id) {
+    return withErrorHandling(
+      async () => {
+        set({ error: null })
+        await api.deleteCase(id)
+        set((state) => ({
+          data: { ...state.data, cases: state.data.cases.filter((item) => item.id !== id) },
+        }))
+      },
+      (error) => set({ error: error.message || 'Unable to remove case.' })
+    )
   },
-  addClient: (values) => {
-    const current = get().data
-    const newClient = {
-      id: newId(),
-      createdAt: new Date().toISOString(),
-      ...values,
-    }
-    const next = {
-      ...current,
-      clients: [...current.clients, newClient],
-    }
-    set(() => sync(next))
-    return newClient.id
+  async addClient(values) {
+    return withErrorHandling(
+      async () => {
+        set({ error: null })
+        const created = await api.createClient(values)
+        set((state) => ({
+          data: { ...state.data, clients: [created, ...state.data.clients] },
+        }))
+        return created.id
+      },
+      (error) => set({ error: error.message || 'Unable to add client.' })
+    )
   },
-  removeClient: (id) => {
-    const current = get().data
-    const next = {
-      ...current,
-      clients: current.clients.filter((item) => item.id !== id),
-    }
-    set(() => sync(next))
+  async removeClient(id) {
+    return withErrorHandling(
+      async () => {
+        set({ error: null })
+        await api.deleteClient(id)
+        set((state) => ({
+          data: { ...state.data, clients: state.data.clients.filter((item) => item.id !== id) },
+        }))
+      },
+      (error) => set({ error: error.message || 'Unable to remove client.' })
+    )
   },
-  addTask: (values) => {
-    const current = get().data
-    const newTask = {
-      id: newId(),
-      createdAt: new Date().toISOString(),
-      ...values,
-    }
-    const next = {
-      ...current,
-      tasks: [...current.tasks, newTask],
-    }
-    set(() => sync(next))
-    return newTask.id
+  async addTask(values) {
+    return withErrorHandling(
+      async () => {
+        set({ error: null })
+        const created = await api.createTask(values)
+        set((state) => ({
+          data: { ...state.data, tasks: [created, ...state.data.tasks] },
+        }))
+        return created.id
+      },
+      (error) => set({ error: error.message || 'Unable to add task.' })
+    )
   },
-  removeTask: (id) => {
-    const current = get().data
-    const next = {
-      ...current,
-      tasks: current.tasks.filter((item) => item.id !== id),
-    }
-    set(() => sync(next))
+  async removeTask(id) {
+    return withErrorHandling(
+      async () => {
+        set({ error: null })
+        await api.deleteTask(id)
+        set((state) => ({
+          data: { ...state.data, tasks: state.data.tasks.filter((item) => item.id !== id) },
+        }))
+      },
+      (error) => set({ error: error.message || 'Unable to remove task.' })
+    )
   },
-  addTeamMember: (values) => {
-    const current = get().data
-    const newMember = {
-      id: newId(),
-      createdAt: new Date().toISOString(),
-      ...values,
-    }
-    const next = {
-      ...current,
-      team: [...current.team, newMember],
-    }
-    set(() => sync(next))
-    return newMember.id
+  async addTeamMember(values) {
+    return withErrorHandling(
+      async () => {
+        set({ error: null })
+        const created = await api.createTeamMember(values)
+        set((state) => ({
+          data: { ...state.data, team: [created, ...state.data.team] },
+        }))
+        return created.id
+      },
+      (error) => set({ error: error.message || 'Unable to add team member.' })
+    )
   },
-  removeTeamMember: (id) => {
-    const current = get().data
-    const next = {
-      ...current,
-      team: current.team.filter((item) => item.id !== id),
-    }
-    set(() => sync(next))
+  async removeTeamMember(id) {
+    return withErrorHandling(
+      async () => {
+        set({ error: null })
+        await api.deleteTeamMember(id)
+        set((state) => ({
+          data: { ...state.data, team: state.data.team.filter((item) => item.id !== id) },
+        }))
+      },
+      (error) => set({ error: error.message || 'Unable to remove team member.' })
+    )
   },
-  addResource: (values) => {
-    const current = get().data
-    const newResource = {
-      id: newId(),
-      createdAt: new Date().toISOString(),
-      ...values,
-    }
-    const next = {
-      ...current,
-      resources: [...current.resources, newResource],
-    }
-    set(() => sync(next))
-    return newResource.id
+  async addResource(values) {
+    return withErrorHandling(
+      async () => {
+        set({ error: null })
+        const created = await api.createResource(values)
+        set((state) => ({
+          data: { ...state.data, resources: [created, ...state.data.resources] },
+        }))
+        return created.id
+      },
+      (error) => set({ error: error.message || 'Unable to add resource.' })
+    )
   },
-  removeResource: (id) => {
-    const current = get().data
-    const next = {
-      ...current,
-      resources: current.resources.filter((item) => item.id !== id),
-    }
-    set(() => sync(next))
+  async removeResource(id) {
+    return withErrorHandling(
+      async () => {
+        set({ error: null })
+        await api.deleteResource(id)
+        set((state) => ({
+          data: { ...state.data, resources: state.data.resources.filter((item) => item.id !== id) },
+        }))
+      },
+      (error) => set({ error: error.message || 'Unable to remove resource.' })
+    )
   },
-  addSupportDesk: (values) => {
-    const current = get().data
-    const newDesk = {
-      id: newId(),
-      createdAt: new Date().toISOString(),
-      ...values,
-    }
-    const next = {
-      ...current,
-      supportDesks: [...current.supportDesks, newDesk],
-    }
-    set(() => sync(next))
-    return newDesk.id
+  async addSupportDesk(values) {
+    return withErrorHandling(
+      async () => {
+        set({ error: null })
+        const created = await api.createSupportDesk(values)
+        set((state) => ({
+          data: { ...state.data, supportDesks: [created, ...state.data.supportDesks] },
+        }))
+        return created.id
+      },
+      (error) => set({ error: error.message || 'Unable to add support desk.' })
+    )
   },
-  removeSupportDesk: (id) => {
-    const current = get().data
-    const next = {
-      ...current,
-      supportDesks: current.supportDesks.filter((item) => item.id !== id),
-    }
-    set(() => sync(next))
+  async removeSupportDesk(id) {
+    return withErrorHandling(
+      async () => {
+        set({ error: null })
+        await api.deleteSupportDesk(id)
+        set((state) => ({
+          data: {
+            ...state.data,
+            supportDesks: state.data.supportDesks.filter((item) => item.id !== id),
+          },
+        }))
+      },
+      (error) => set({ error: error.message || 'Unable to remove support desk.' })
+    )
   },
 }))

@@ -43,6 +43,11 @@ export default function DashboardPage() {
   const [statForm, setStatForm] = useState(defaultStatForm)
   const [taskForm, setTaskForm] = useState(defaultTaskForm)
   const [teamForm, setTeamForm] = useState(defaultTeamForm)
+  const [isSavingStats, setIsSavingStats] = useState(false)
+  const [isSavingTask, setIsSavingTask] = useState(false)
+  const [isSavingTeam, setIsSavingTeam] = useState(false)
+  const [removingTaskId, setRemovingTaskId] = useState(null)
+  const [removingTeamId, setRemovingTeamId] = useState(null)
 
   useEffect(() => {
     setStatForm({
@@ -66,14 +71,21 @@ export default function DashboardPage() {
     setStatForm((prev) => ({ ...prev, [name]: value }))
   }
 
-  const handleStatsSubmit = (event) => {
+  const handleStatsSubmit = async (event) => {
     event.preventDefault()
-    updateStats({
-      activeMatters: Number(statForm.activeMatters) || 0,
-      hearingsThisWeek: Number(statForm.hearingsThisWeek) || 0,
-      filingsPending: Number(statForm.filingsPending) || 0,
-      teamUtilisation: Number(statForm.teamUtilisation) || 0,
-    })
+    setIsSavingStats(true)
+    try {
+      await updateStats({
+        activeMatters: Number(statForm.activeMatters) || 0,
+        hearingsThisWeek: Number(statForm.hearingsThisWeek) || 0,
+        filingsPending: Number(statForm.filingsPending) || 0,
+        teamUtilisation: Number(statForm.teamUtilisation) || 0,
+      })
+    } catch (error) {
+      console.error('Failed to update metrics', error)
+    } finally {
+      setIsSavingStats(false)
+    }
   }
 
   const handleTaskChange = (event) => {
@@ -81,11 +93,18 @@ export default function DashboardPage() {
     setTaskForm((prev) => ({ ...prev, [name]: value }))
   }
 
-  const handleTaskSubmit = (event) => {
+  const handleTaskSubmit = async (event) => {
     event.preventDefault()
     if (!taskForm.title || !taskForm.owner || !taskForm.due) return
-    addTask(taskForm)
-    setTaskForm(defaultTaskForm)
+    setIsSavingTask(true)
+    try {
+      await addTask(taskForm)
+      setTaskForm(defaultTaskForm)
+    } catch (error) {
+      console.error('Failed to add task', error)
+    } finally {
+      setIsSavingTask(false)
+    }
   }
 
   const handleTeamChange = (event) => {
@@ -93,11 +112,40 @@ export default function DashboardPage() {
     setTeamForm((prev) => ({ ...prev, [name]: value }))
   }
 
-  const handleTeamSubmit = (event) => {
+  const handleTeamSubmit = async (event) => {
     event.preventDefault()
     if (!teamForm.name || !teamForm.role) return
-    addTeamMember(teamForm)
-    setTeamForm(defaultTeamForm)
+    setIsSavingTeam(true)
+    try {
+      await addTeamMember(teamForm)
+      setTeamForm(defaultTeamForm)
+    } catch (error) {
+      console.error('Failed to add team member', error)
+    } finally {
+      setIsSavingTeam(false)
+    }
+  }
+
+  const handleTaskRemove = async (id) => {
+    setRemovingTaskId(id)
+    try {
+      await removeTask(id)
+    } catch (error) {
+      console.error('Failed to remove task', error)
+    } finally {
+      setRemovingTaskId(null)
+    }
+  }
+
+  const handleTeamRemove = async (id) => {
+    setRemovingTeamId(id)
+    try {
+      await removeTeamMember(id)
+    } catch (error) {
+      console.error('Failed to remove team member', error)
+    } finally {
+      setRemovingTeamId(null)
+    }
   }
 
   return (
@@ -136,7 +184,9 @@ export default function DashboardPage() {
             </label>
           ))}
           <div className="md:col-span-2 lg:col-span-4 flex justify-end">
-            <button type="submit" className="btn btn-primary">Save metrics</button>
+            <button type="submit" className="btn btn-primary" disabled={isSavingStats}>
+              {isSavingStats ? 'Saving…' : 'Save metrics'}
+            </button>
           </div>
         </form>
       </section>
@@ -224,7 +274,9 @@ export default function DashboardPage() {
                 </label>
               </div>
               <div className="flex justify-end">
-                <button type="submit" className="btn btn-primary">Add task</button>
+                <button type="submit" className="btn btn-primary" disabled={isSavingTask}>
+                  {isSavingTask ? 'Adding…' : 'Add task'}
+                </button>
               </div>
             </form>
             <ul className="space-y-3 text-sm">
@@ -241,10 +293,11 @@ export default function DashboardPage() {
                     </div>
                     <button
                       type="button"
-                      onClick={() => removeTask(task.id)}
+                      onClick={() => handleTaskRemove(task.id)}
                       className="text-xs text-red-500 hover:text-red-600"
+                      disabled={removingTaskId === task.id}
                     >
-                      Remove
+                      {removingTaskId === task.id ? 'Removing…' : 'Remove'}
                     </button>
                   </li>
                 ))
@@ -303,7 +356,9 @@ export default function DashboardPage() {
                 </label>
               </div>
               <div className="flex justify-end">
-                <button type="submit" className="btn btn-primary">Add contact</button>
+                <button type="submit" className="btn btn-primary" disabled={isSavingTeam}>
+                  {isSavingTeam ? 'Adding…' : 'Add contact'}
+                </button>
               </div>
             </form>
             <ul className="space-y-3 text-sm text-slate-600 dark:text-slate-300">
@@ -311,7 +366,10 @@ export default function DashboardPage() {
                 <li className="text-slate-500">Add contacts to display them here.</li>
               ) : (
                 team.map((member) => (
-                  <li key={member.id} className="rounded-xl border border-slate-200/70 dark:border-slate-800/70 p-3 flex justify-between gap-3">
+                  <li
+                    key={member.id}
+                    className="rounded-xl border border-slate-200/70 dark:border-slate-800/70 p-3 flex justify-between gap-3"
+                  >
                     <div>
                       <p className="font-semibold text-slate-900 dark:text-white">{member.name}</p>
                       <p>{member.role}</p>
@@ -320,10 +378,11 @@ export default function DashboardPage() {
                     </div>
                     <button
                       type="button"
-                      onClick={() => removeTeamMember(member.id)}
+                      onClick={() => handleTeamRemove(member.id)}
                       className="text-xs text-red-500 hover:text-red-600"
+                      disabled={removingTeamId === member.id}
                     >
-                      Remove
+                      {removingTeamId === member.id ? 'Removing…' : 'Remove'}
                     </button>
                   </li>
                 ))

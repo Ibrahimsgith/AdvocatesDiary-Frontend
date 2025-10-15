@@ -18,17 +18,37 @@ export default function CasesPage() {
   const addCase = usePortalData((state) => state.addCase)
   const removeCase = usePortalData((state) => state.removeCase)
   const [form, setForm] = useState(defaultForm)
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [removingId, setRemovingId] = useState(null)
 
   const handleChange = (event) => {
     const { name, value } = event.target
     setForm((prev) => ({ ...prev, [name]: value }))
   }
 
-  const handleSubmit = (event) => {
+  const handleSubmit = async (event) => {
     event.preventDefault()
     if (!form.caseNumber || !form.client) return
-    addCase(form)
-    setForm(defaultForm)
+    setIsSubmitting(true)
+    try {
+      await addCase(form)
+      setForm(defaultForm)
+    } catch (error) {
+      console.error('Failed to add case', error)
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
+  const handleRemove = async (id) => {
+    setRemovingId(id)
+    try {
+      await removeCase(id)
+    } catch (error) {
+      console.error('Failed to remove case', error)
+    } finally {
+      setRemovingId(null)
+    }
   }
 
   return (
@@ -124,7 +144,9 @@ export default function CasesPage() {
             />
           </label>
           <div className="md:col-span-2 flex justify-end">
-            <button type="submit" className="btn btn-primary">Add matter</button>
+            <button type="submit" className="btn btn-primary" disabled={isSubmitting}>
+              {isSubmitting ? 'Adding…' : 'Add matter'}
+            </button>
           </div>
         </form>
       </section>
@@ -165,10 +187,11 @@ export default function CasesPage() {
                   <td className="px-4 py-4 text-right">
                     <button
                       type="button"
-                      onClick={() => removeCase(item.id)}
+                      onClick={() => handleRemove(item.id)}
                       className="text-xs text-red-500 hover:text-red-600"
+                      disabled={removingId === item.id}
                     >
-                      Remove
+                      {removingId === item.id ? 'Removing…' : 'Remove'}
                     </button>
                   </td>
                 </tr>

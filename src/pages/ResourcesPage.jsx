@@ -3,13 +3,17 @@ import { usePortalData } from '../store/portalData'
 
 const defaultResourceForm = {
   title: '',
-  description: '',
+  type: '',
   link: '',
+  owner: '',
+  notes: '',
 }
 
 const defaultDeskForm = {
-  name: '',
+  department: '',
+  phone: '',
   email: '',
+  hours: '',
   notes: '',
 }
 
@@ -24,17 +28,28 @@ export default function ResourcesPage() {
 
   const [resourceForm, setResourceForm] = useState(defaultResourceForm)
   const [deskForm, setDeskForm] = useState(defaultDeskForm)
+  const [isAddingResource, setIsAddingResource] = useState(false)
+  const [isAddingDesk, setIsAddingDesk] = useState(false)
+  const [removingResourceId, setRemovingResourceId] = useState(null)
+  const [removingDeskId, setRemovingDeskId] = useState(null)
 
   const handleResourceChange = (event) => {
     const { name, value } = event.target
     setResourceForm((prev) => ({ ...prev, [name]: value }))
   }
 
-  const handleResourceSubmit = (event) => {
+  const handleResourceSubmit = async (event) => {
     event.preventDefault()
     if (!resourceForm.title) return
-    addResource(resourceForm)
-    setResourceForm(defaultResourceForm)
+    setIsAddingResource(true)
+    try {
+      await addResource(resourceForm)
+      setResourceForm(defaultResourceForm)
+    } catch (error) {
+      console.error('Failed to add resource', error)
+    } finally {
+      setIsAddingResource(false)
+    }
   }
 
   const handleDeskChange = (event) => {
@@ -42,11 +57,40 @@ export default function ResourcesPage() {
     setDeskForm((prev) => ({ ...prev, [name]: value }))
   }
 
-  const handleDeskSubmit = (event) => {
+  const handleDeskSubmit = async (event) => {
     event.preventDefault()
-    if (!deskForm.name) return
-    addSupportDesk(deskForm)
-    setDeskForm(defaultDeskForm)
+    if (!deskForm.department) return
+    setIsAddingDesk(true)
+    try {
+      await addSupportDesk(deskForm)
+      setDeskForm(defaultDeskForm)
+    } catch (error) {
+      console.error('Failed to add support desk', error)
+    } finally {
+      setIsAddingDesk(false)
+    }
+  }
+
+  const handleResourceRemove = async (id) => {
+    setRemovingResourceId(id)
+    try {
+      await removeResource(id)
+    } catch (error) {
+      console.error('Failed to remove resource', error)
+    } finally {
+      setRemovingResourceId(null)
+    }
+  }
+
+  const handleDeskRemove = async (id) => {
+    setRemovingDeskId(id)
+    try {
+      await removeSupportDesk(id)
+    } catch (error) {
+      console.error('Failed to remove support desk', error)
+    } finally {
+      setRemovingDeskId(null)
+    }
   }
 
   return (
@@ -70,18 +114,28 @@ export default function ResourcesPage() {
               required
             />
           </label>
-          <label className="space-y-2 text-sm md:col-span-2">
-            <span className="block font-medium text-slate-600 dark:text-slate-300">Description</span>
-            <textarea
-              name="description"
-              className="input min-h-[80px]"
-              value={resourceForm.description}
+          <label className="space-y-2 text-sm">
+            <span className="block font-medium text-slate-600 dark:text-slate-300">Category</span>
+            <input
+              name="type"
+              className="input"
+              value={resourceForm.type}
               onChange={handleResourceChange}
-              placeholder="Briefly describe what the resource covers"
+              placeholder="Template, policy, guide"
+            />
+          </label>
+          <label className="space-y-2 text-sm">
+            <span className="block font-medium text-slate-600 dark:text-slate-300">Owner</span>
+            <input
+              name="owner"
+              className="input"
+              value={resourceForm.owner}
+              onChange={handleResourceChange}
+              placeholder="Assigned team"
             />
           </label>
           <label className="space-y-2 text-sm md:col-span-2">
-            <span className="block font-medium text-slate-600 dark:text-slate-300">Link or reference</span>
+            <span className="block font-medium text-slate-600 dark:text-slate-300">Link</span>
             <input
               name="link"
               className="input"
@@ -90,8 +144,20 @@ export default function ResourcesPage() {
               placeholder="https://drive.google.com/..."
             />
           </label>
+          <label className="space-y-2 text-sm md:col-span-3">
+            <span className="block font-medium text-slate-600 dark:text-slate-300">Notes</span>
+            <textarea
+              name="notes"
+              className="input min-h-[80px]"
+              value={resourceForm.notes}
+              onChange={handleResourceChange}
+              placeholder="Brief description, version history, or access notes"
+            />
+          </label>
           <div className="md:col-span-3 flex justify-end">
-            <button type="submit" className="btn btn-primary">Add resource</button>
+            <button type="submit" className="btn btn-primary" disabled={isAddingResource}>
+              {isAddingResource ? 'Saving…' : 'Add resource'}
+            </button>
           </div>
         </form>
         <div className="grid gap-4 md:grid-cols-2">
@@ -103,14 +169,18 @@ export default function ResourcesPage() {
                 <header className="flex items-start justify-between gap-3">
                   <div>
                     <h3 className="text-lg font-semibold text-slate-900 dark:text-white">{item.title}</h3>
-                    {item.description && <p className="text-sm text-slate-500">{item.description}</p>}
+                    <div className="text-xs uppercase tracking-wide text-slate-400">
+                      {[item.type, item.owner].filter(Boolean).join(' • ')}
+                    </div>
+                    {item.notes && <p className="text-sm text-slate-500">{item.notes}</p>}
                   </div>
                   <button
                     type="button"
-                    onClick={() => removeResource(item.id)}
+                    onClick={() => handleResourceRemove(item.id)}
                     className="text-xs text-red-500 hover:text-red-600"
+                    disabled={removingResourceId === item.id}
                   >
-                    Remove
+                    {removingResourceId === item.id ? 'Removing…' : 'Remove'}
                   </button>
                 </header>
                 {item.link && (
@@ -130,12 +200,22 @@ export default function ResourcesPage() {
           <label className="space-y-2 text-sm">
             <span className="block font-medium text-slate-600 dark:text-slate-300">Desk name</span>
             <input
-              name="name"
+              name="department"
               className="input"
-              value={deskForm.name}
+              value={deskForm.department}
               onChange={handleDeskChange}
               placeholder="Court filings desk"
               required
+            />
+          </label>
+          <label className="space-y-2 text-sm">
+            <span className="block font-medium text-slate-600 dark:text-slate-300">Phone</span>
+            <input
+              name="phone"
+              className="input"
+              value={deskForm.phone}
+              onChange={handleDeskChange}
+              placeholder="Contact number"
             />
           </label>
           <label className="space-y-2 text-sm">
@@ -149,7 +229,17 @@ export default function ResourcesPage() {
               placeholder="team@firm.com"
             />
           </label>
-          <label className="space-y-2 text-sm md:col-span-2">
+          <label className="space-y-2 text-sm">
+            <span className="block font-medium text-slate-600 dark:text-slate-300">Hours</span>
+            <input
+              name="hours"
+              className="input"
+              value={deskForm.hours}
+              onChange={handleDeskChange}
+              placeholder="Weekdays 9am - 6pm"
+            />
+          </label>
+          <label className="space-y-2 text-sm md:col-span-3">
             <span className="block font-medium text-slate-600 dark:text-slate-300">Notes</span>
             <textarea
               name="notes"
@@ -160,7 +250,9 @@ export default function ResourcesPage() {
             />
           </label>
           <div className="md:col-span-3 flex justify-end">
-            <button type="submit" className="btn btn-primary">Add support desk</button>
+            <button type="submit" className="btn btn-primary" disabled={isAddingDesk}>
+              {isAddingDesk ? 'Saving…' : 'Add support desk'}
+            </button>
           </div>
         </form>
         <div className="grid gap-4 md:grid-cols-2">
@@ -171,15 +263,20 @@ export default function ResourcesPage() {
               <article key={desk.id} className="card p-5 space-y-2">
                 <header className="flex items-start justify-between gap-3">
                   <div>
-                    <h3 className="text-base font-semibold text-slate-900 dark:text-white">{desk.name}</h3>
-                    {desk.email && <p className="text-sm text-slate-500">Email: {desk.email}</p>}
+                    <h3 className="text-base font-semibold text-slate-900 dark:text-white">{desk.department}</h3>
+                    <div className="text-xs text-slate-500 space-y-1">
+                      {desk.phone && <p>Phone: {desk.phone}</p>}
+                      {desk.email && <p>Email: {desk.email}</p>}
+                      {desk.hours && <p>Hours: {desk.hours}</p>}
+                    </div>
                   </div>
                   <button
                     type="button"
-                    onClick={() => removeSupportDesk(desk.id)}
+                    onClick={() => handleDeskRemove(desk.id)}
                     className="text-xs text-red-500 hover:text-red-600"
+                    disabled={removingDeskId === desk.id}
                   >
-                    Remove
+                    {removingDeskId === desk.id ? 'Removing…' : 'Remove'}
                   </button>
                 </header>
                 {desk.notes && <p className="text-sm text-slate-500">{desk.notes}</p>}

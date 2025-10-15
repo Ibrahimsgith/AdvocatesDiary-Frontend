@@ -1,6 +1,7 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link, NavLink, Outlet } from 'react-router-dom'
 import { Menu, X } from 'lucide-react'
+import { usePortalData } from '../store/portalData'
 
 const navItems = [
   { to: '/dashboard', label: 'Overview' },
@@ -10,8 +11,44 @@ const navItems = [
   { to: '/resources', label: 'Resources' },
 ]
 
-export default function ShellLayout({ onLogout }) {
+export default function ShellLayout({ onLogout, user }) {
   const [mobileOpen, setMobileOpen] = useState(false)
+  const load = usePortalData((state) => state.load)
+  const hasLoaded = usePortalData((state) => state.hasLoaded)
+  const isLoading = usePortalData((state) => state.isLoading)
+  const error = usePortalData((state) => state.error)
+  const clearError = usePortalData((state) => state.clearError)
+
+  useEffect(() => {
+    if (!hasLoaded && !isLoading) {
+      load().catch(() => {})
+    }
+  }, [hasLoaded, isLoading, load])
+
+  const handleRetry = () => {
+    clearError()
+    load().catch(() => {})
+  }
+
+  const renderContent = () => {
+    if (!hasLoaded) {
+      if (isLoading) {
+        return (
+          <div className="card p-6 text-sm text-slate-500">Loading the latest portal data…</div>
+        )
+      }
+      return (
+        <div className="card p-6 space-y-3 text-sm">
+          <p className="font-medium text-red-600">{error || 'Unable to load portal data.'}</p>
+          <button type="button" className="btn btn-primary" onClick={handleRetry}>
+            Try again
+          </button>
+        </div>
+      )
+    }
+
+    return <Outlet />
+  }
 
   return (
     <div className="min-h-screen bg-slate-100/80 dark:bg-slate-950 text-slate-900 dark:text-slate-100">
@@ -41,6 +78,11 @@ export default function ShellLayout({ onLogout }) {
                 {item.label}
               </NavLink>
             ))}
+            {user && (
+              <span className="text-xs uppercase tracking-wide text-slate-400">
+                {user.name || user.email}
+              </span>
+            )}
             <button onClick={onLogout} className="btn">Log out</button>
           </div>
         </div>
@@ -62,6 +104,9 @@ export default function ShellLayout({ onLogout }) {
                   </NavLink>
                 </li>
               ))}
+              {user && (
+                <li className="px-3 text-xs uppercase tracking-wide text-slate-400">{user.name || user.email}</li>
+              )}
               <li>
                 <button onClick={onLogout} className="btn w-full" type="button">
                   Log out
@@ -72,8 +117,16 @@ export default function ShellLayout({ onLogout }) {
         )}
       </header>
 
-      <main className="max-w-6xl mx-auto px-4 py-10">
-        <Outlet />
+      <main className="max-w-6xl mx-auto px-4 py-10 space-y-4">
+        {error && hasLoaded && (
+          <div className="rounded-2xl border border-red-200 bg-red-50/80 px-4 py-3 text-sm text-red-700 flex items-start justify-between gap-4">
+            <span>{error}</span>
+            <button type="button" className="text-xs font-medium underline" onClick={clearError}>
+              Dismiss
+            </button>
+          </div>
+        )}
+        {renderContent()}
       </main>
     </div>
   )

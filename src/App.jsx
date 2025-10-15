@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Navigate, Route, Routes } from 'react-router-dom'
+import { api } from './lib/api'
+import { usePortalData } from './store/portalData'
 import ShellLayout from './components/ShellLayout.jsx'
 import LoginPage from './pages/LoginPage.jsx'
 import DashboardPage from './pages/DashboardPage.jsx'
@@ -9,27 +11,74 @@ import UpcomingCasesPage from './pages/UpcomingCasesPage.jsx'
 import ResourcesPage from './pages/ResourcesPage.jsx'
 
 export default function App() {
-  const [isAuthenticated, setIsAuthenticated] = useState(() => {
-    if (typeof window === 'undefined') return false
-    return localStorage.getItem('ad-authenticated') === 'true'
-  })
+  const [authState, setAuthState] = useState({ checking: true, isAuthenticated: false })
+  const [user, setUser] = useState(null)
 
   useEffect(() => {
-    if (isAuthenticated) {
-      localStorage.setItem('ad-authenticated', 'true')
-    } else {
-      localStorage.removeItem('ad-authenticated')
+    let cancelled = false
+    const verifySession = async () => {
+      const token = typeof window !== 'undefined' ? localStorage.getItem('ad-token') : null
+      if (!token) {
+        setAuthState({ checking: false, isAuthenticated: false })
+        setUser(null)
+        return
+      }
+      try {
+        const session = await api.getSession()
+        if (!cancelled) {
+          setUser(session.user)
+          setAuthState({ checking: false, isAuthenticated: true })
+        }
+      } catch (error) {
+        console.warn('Failed to verify session', error)
+        localStorage.removeItem('ad-token')
+        if (!cancelled) {
+          setUser(null)
+          setAuthState({ checking: false, isAuthenticated: false })
+        }
+      }
     }
-  }, [isAuthenticated])
 
-  const handleLogin = (values) => {
-    if (!values.email || !values.password) return false
-    setIsAuthenticated(true)
-    return true
+    verifySession()
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  const handleLogin = async (values) => {
+    if (!values.email || !values.password) {
+      return { success: false, error: 'Please provide both email and password to continue.' }
+    }
+    try {
+      const response = await api.login(values)
+      localStorage.setItem('ad-token', response.token)
+      setUser(response.user)
+      setAuthState({ checking: false, isAuthenticated: true })
+      await usePortalData.getState().refresh()
+      return { success: true }
+    } catch (error) {
+      return { success: false, error: error.message || 'Unable to sign in. Please try again.' }
+    }
   }
 
-  const handleLogout = () => {
-    setIsAuthenticated(false)
+  const handleLogout = async () => {
+    try {
+      await api.logout()
+    } catch (error) {
+      console.warn('Failed to revoke session', error)
+    }
+    localStorage.removeItem('ad-token')
+    usePortalData.getState().reset()
+    setUser(null)
+    setAuthState({ checking: false, isAuthenticated: false })
+  }
+
+  if (authState.checking) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-slate-100 dark:bg-slate-950">
+        <p className="text-sm text-slate-500">Checking your session…</p>
+      </div>
+    )
   }
 
   return (
@@ -37,7 +86,7 @@ export default function App() {
       <Route
         path="/"
         element={
-          isAuthenticated ? (
+          authState.isAuthenticated ? (
             <Navigate to="/dashboard" replace />
           ) : (
             <LoginPage onSubmit={handleLogin} />
@@ -47,8 +96,8 @@ export default function App() {
 
       <Route
         element={
-          isAuthenticated ? (
-            <ShellLayout onLogout={handleLogout} />
+          authState.isAuthenticated ? (
+            <ShellLayout onLogout={handleLogout} user={user} />
           ) : (
             <Navigate to="/" replace />
           )
@@ -63,7 +112,7 @@ export default function App() {
 
       <Route
         path="*"
-        element={<Navigate to={isAuthenticated ? '/dashboard' : '/'} replace />}
+        element={<Navigate to={authState.isAuthenticated ? '/dashboard' : '/'} replace />}
       />
     </Routes>
   )

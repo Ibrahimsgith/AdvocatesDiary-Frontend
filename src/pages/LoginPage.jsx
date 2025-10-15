@@ -3,17 +3,27 @@ import { useState } from 'react'
 export default function LoginPage({ onSubmit }) {
   const [form, setForm] = useState({ email: '', password: '' })
   const [error, setError] = useState('')
+  const [isSubmitting, setIsSubmitting] = useState(false)
 
   const handleChange = (event) => {
     const { name, value } = event.target
     setForm((prev) => ({ ...prev, [name]: value }))
   }
 
-  const handleSubmit = (event) => {
+  const handleSubmit = async (event) => {
     event.preventDefault()
-    const success = onSubmit(form)
-    if (!success) {
-      setError('Please provide both email and password to continue.')
+    setError('')
+    setIsSubmitting(true)
+    try {
+      const result = await onSubmit(form)
+      if (!result?.success) {
+        setError(result?.error || 'Unable to sign in. Please try again.')
+        setIsSubmitting(false)
+      }
+    } catch (err) {
+      console.error(err)
+      setError('An unexpected error occurred. Please try again.')
+      setIsSubmitting(false)
     }
   }
 
@@ -54,7 +64,9 @@ export default function LoginPage({ onSubmit }) {
 
           {error && <p className="text-sm text-red-600">{error}</p>}
 
-          <button type="submit" className="btn btn-primary w-full">Sign in</button>
+          <button type="submit" className="btn btn-primary w-full" disabled={isSubmitting}>
+            {isSubmitting ? 'Signing in…' : 'Sign in'}
+          </button>
         </form>
 
         <div className="text-xs text-slate-400 text-center">
