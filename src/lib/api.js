@@ -22,15 +22,30 @@ const API_BASE_URL = resolveBaseUrl()
 
 const parseResponse = async (response) => {
   const contentType = response.headers.get('content-type') || ''
+  const isJson = contentType.includes('application/json')
   const hasBody = ![204, 205].includes(response.status)
-  const body = hasBody && contentType.includes('application/json') ? await response.json() : null
+  let body = null
+
+  if (hasBody && isJson) {
+    body = await response.json()
+  }
+
   if (!response.ok) {
+    if (!isJson) {
+      const offlineError = new Error('Portal server is unavailable. Running in offline mode.')
+      offlineError.status = response.status
+      offlineError.code = 'API_UNAVAILABLE'
+      offlineError.body = null
+      throw offlineError
+    }
+
     const message = body?.message || 'Request failed'
     const error = new Error(message)
     error.status = response.status
     error.body = body
     throw error
   }
+
   return body
 }
 

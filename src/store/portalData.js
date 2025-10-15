@@ -100,7 +100,9 @@ const generateId = () => {
 }
 
 const isNetworkError = (error) =>
-  error?.message === 'Unable to reach the server. Please try again.' || error?.cause instanceof TypeError
+  error?.code === 'API_UNAVAILABLE' ||
+  error?.message === 'Unable to reach the server. Please try again.' ||
+  error?.cause instanceof TypeError
 
 const timestamp = () => new Date().toISOString()
 
