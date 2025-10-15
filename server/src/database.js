@@ -8,12 +8,33 @@ import { config } from './config.js'
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
 
-const dbDir = path.join(__dirname, '..', 'data')
-const dbPath = path.join(dbDir, 'pasha-law-senate.db')
+const DEFAULT_DB_DIR = path.join(__dirname, '..', 'data')
+const DEFAULT_DB_FILENAME = 'pasha-law-senate.db'
 
-fs.mkdirSync(dbDir, { recursive: true })
+const normaliseDatabasePath = () => {
+  const configured = config.databasePath
+  if (!configured) {
+    return path.join(DEFAULT_DB_DIR, DEFAULT_DB_FILENAME)
+  }
 
-export const db = new Database(dbPath)
+  const endsWithSeparator = configured.endsWith('/') || configured.endsWith('\\')
+  const withFilename = endsWithSeparator
+    ? path.join(configured, DEFAULT_DB_FILENAME)
+    : configured
+
+  if (path.isAbsolute(withFilename)) {
+    return withFilename
+  }
+
+  return path.join(__dirname, '..', withFilename)
+}
+
+const databasePath = normaliseDatabasePath()
+const databaseDir = path.dirname(databasePath)
+
+fs.mkdirSync(databaseDir, { recursive: true })
+
+export const db = new Database(databasePath)
 db.pragma('journal_mode = WAL')
 
 db.exec(`

@@ -47,3 +47,19 @@ This command compiles the React application into static assets under `dist/`.
 ## API reference
 The backend exposes REST endpoints under `/api` for authentication, metrics, cases, clients, tasks, team contacts, resources, and support desks. See `server/src/server.js` for the full route list.
 
+## Deploying the backend to Render
+The repository includes a `render.yaml` blueprint for provisioning the API with a persistent disk so SQLite writes are saved between
+deploys. To deploy manually:
+
+1. Create a new **Web Service** from this repository and point the root directory to `server`.
+2. Use `npm install` as the build command and `npm run start` as the start command.
+3. Attach a disk (1 GB is plenty) mounted at `/var/data`.
+4. Add the following environment variables:
+   - `DATABASE_PATH=/var/data/pasha-law-senate.db`
+   - `CLIENT_ORIGIN` pointing at your front-end host (for example, the Render static site URL).
+   - Optionally override `ADMIN_EMAIL`, `ADMIN_PASSWORD`, and `SESSION_TTL_HOURS`.
+5. Deploy the service. SQLite will store its data on the mounted disk, so new cases and clients persist across restarts.
+
+When hosting the React app separately (such as a Render Static Site), set `VITE_API_BASE_URL` in the front-end environment to the
+API's public URL so requests are sent to the live backend.
+
