@@ -130,6 +130,36 @@ export const findUserByEmail = (email) => {
   return db.prepare('SELECT id, email, password_hash, name FROM users WHERE email = ?').get(email.toLowerCase())
 }
 
+export const createUser = ({ email, password, name }) => {
+  const normalisedEmail = String(email || '').trim().toLowerCase()
+  const trimmedName = String(name || '').trim()
+  if (!normalisedEmail || !trimmedName) {
+    throw new Error('Name and email are required.')
+  }
+
+  const passwordValue = String(password || '')
+  const passwordHash = hashPassword(passwordValue)
+
+  try {
+    const result = db
+      .prepare('INSERT INTO users (email, password_hash, name) VALUES (?, ?, ?)')
+      .run(normalisedEmail, passwordHash, trimmedName)
+
+    return {
+      id: Number(result.lastInsertRowid),
+      email: normalisedEmail,
+      name: trimmedName,
+    }
+  } catch (error) {
+    if (error?.code === 'SQLITE_CONSTRAINT_UNIQUE') {
+      const duplicateError = new Error('A user with this email already exists.')
+      duplicateError.code = 'USER_EXISTS'
+      throw duplicateError
+    }
+    throw error
+  }
+}
+
 export const createSession = (userId) => {
   const token = randomUUID()
   const createdAt = new Date()

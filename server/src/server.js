@@ -7,6 +7,7 @@ import {
 import {
   seedDefaults,
   findUserByEmail,
+  createUser,
   verifyPassword,
   createSession,
   findSession,
@@ -68,6 +69,39 @@ app.post(
       user: { id: user.id, email: user.email, name: user.name },
       expiresAt: session.expiresAt,
     })
+  })
+)
+
+app.post(
+  '/api/auth/register',
+  asyncHandler((req, res) => {
+    const { email, password, name } = req.body || {}
+    const trimmedName = typeof name === 'string' ? name.trim() : ''
+    const normalisedEmail = typeof email === 'string' ? email.trim().toLowerCase() : ''
+    if (!trimmedName || !normalisedEmail) {
+      return res.status(400).json({ message: 'Name and email are required.' })
+    }
+    if (!password || String(password).length < 8) {
+      return res
+        .status(400)
+        .json({ message: 'Password must be at least 8 characters long.' })
+    }
+
+    try {
+      const user = createUser({ email: normalisedEmail, password, name: trimmedName })
+      const session = createSession(user.id)
+
+      res.status(201).json({
+        token: session.token,
+        user: { id: user.id, email: user.email, name: user.name },
+        expiresAt: session.expiresAt,
+      })
+    } catch (error) {
+      if (error?.code === 'USER_EXISTS') {
+        return res.status(409).json({ message: 'An account with this email already exists.' })
+      }
+      throw error
+    }
   })
 )
 

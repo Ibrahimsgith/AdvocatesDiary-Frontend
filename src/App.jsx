@@ -61,6 +61,31 @@ export default function App() {
     }
   }
 
+  const handleRegister = async (values) => {
+    const name = values.name?.trim()
+    const email = values.email?.trim()
+    const password = values.password ?? ''
+
+    if (!name || !email) {
+      return { success: false, error: 'Please provide your name and email address.' }
+    }
+
+    if (password.length < 8) {
+      return { success: false, error: 'Password must be at least 8 characters long.' }
+    }
+
+    try {
+      const response = await api.register({ name, email, password })
+      localStorage.setItem('ad-token', response.token)
+      setUser(response.user)
+      setAuthState({ checking: false, isAuthenticated: true })
+      await usePortalData.getState().refresh()
+      return { success: true }
+    } catch (error) {
+      return { success: false, error: error.message || 'Unable to create account right now.' }
+    }
+  }
+
   const handleLogout = async () => {
     try {
       await api.logout()
@@ -89,7 +114,7 @@ export default function App() {
           authState.isAuthenticated ? (
             <Navigate to="/dashboard" replace />
           ) : (
-            <LoginPage onSubmit={handleLogin} />
+            <LoginPage onLogin={handleLogin} onRegister={handleRegister} />
           )
         }
       />

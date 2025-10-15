@@ -32,6 +32,11 @@ const request = async (path, options = {}) => {
 }
 
 export const api = {
+  register: (payload) =>
+    request('/api/auth/register', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
   login: (credentials) =>
     request('/api/auth/login', {
       method: 'POST',
