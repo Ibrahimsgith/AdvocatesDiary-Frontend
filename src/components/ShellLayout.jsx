@@ -11,7 +11,7 @@ const navItems = [
   { to: '/resources', label: 'Resources' },
 ]
 
-export default function ShellLayout({ onLogout, user }) {
+export default function ShellLayout() {
   const [mobileOpen, setMobileOpen] = useState(false)
   const load = usePortalData((state) => state.load)
   const hasLoaded = usePortalData((state) => state.hasLoaded)
@@ -78,12 +78,6 @@ export default function ShellLayout({ onLogout, user }) {
                 {item.label}
               </NavLink>
             ))}
-            {user && (
-              <span className="text-xs uppercase tracking-wide text-slate-400">
-                {user.name || user.email}
-              </span>
-            )}
-            <button onClick={onLogout} className="btn">Log out</button>
           </div>
         </div>
         {mobileOpen && (
@@ -104,14 +98,6 @@ export default function ShellLayout({ onLogout, user }) {
                   </NavLink>
                 </li>
               ))}
-              {user && (
-                <li className="px-3 text-xs uppercase tracking-wide text-slate-400">{user.name || user.email}</li>
-              )}
-              <li>
-                <button onClick={onLogout} className="btn w-full" type="button">
-                  Log out
-                </button>
-              </li>
             </ul>
           </nav>
         )}
