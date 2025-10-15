@@ -210,17 +210,32 @@ export const usePortalData = create((set, get) => {
         set({ data, isLoading: false, hasLoaded: true, mode: 'api', notice: '' })
         return data
       } catch (error) {
-        console.warn('Falling back to offline portal data.', error)
         const localData = readLocalData()
         persistLocalData(localData)
-        set({
-          data: localData,
-          isLoading: false,
-          hasLoaded: true,
-          mode: 'local',
-          notice: OFFLINE_NOTICE,
-          error: null,
-        })
+        const currentMode = get().mode
+
+        if (isNetworkError(error)) {
+          console.warn('Falling back to offline portal data.', error)
+          set({
+            data: localData,
+            isLoading: false,
+            hasLoaded: true,
+            mode: 'local',
+            notice: OFFLINE_NOTICE,
+            error: null,
+          })
+        } else {
+          console.error('Failed to load portal data from API.', error)
+          set({
+            data: localData,
+            isLoading: false,
+            hasLoaded: true,
+            mode: currentMode === 'local' ? 'local' : 'api',
+            notice: currentMode === 'local' ? OFFLINE_NOTICE : '',
+            error: error.message || 'Unable to load portal data.',
+          })
+        }
+
         return localData
       }
     },
