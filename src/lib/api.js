@@ -1,4 +1,24 @@
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:4000'
+const resolveBaseUrl = () => {
+  const configured = import.meta.env.VITE_API_BASE_URL?.trim()
+  if (configured) {
+    return configured.replace(/\/$/, '')
+  }
+
+  if (typeof window === 'undefined') {
+    return 'http://localhost:4000'
+  }
+
+  const { protocol, hostname, port } = window.location
+  const isLocalhost = ['localhost', '127.0.0.1', '::1'].includes(hostname)
+
+  if (isLocalhost && port && port !== '4000') {
+    return `${protocol}//${hostname}:4000`
+  }
+
+  return ''
+}
+
+const API_BASE_URL = resolveBaseUrl()
 
 const parseResponse = async (response) => {
   const contentType = response.headers.get('content-type') || ''
@@ -24,11 +44,19 @@ const request = async (path, options = {}) => {
     headers.set('Authorization', `Bearer ${token}`)
   }
 
-  const response = await fetch(`${API_BASE_URL}${path}`, {
-    ...options,
-    headers,
-  })
-  return parseResponse(response)
+  const url = `${API_BASE_URL}${path}`
+  try {
+    const response = await fetch(url, {
+      ...options,
+      headers,
+    })
+    return parseResponse(response)
+  } catch (error) {
+    const networkError = new Error('Unable to reach the server. Please try again.')
+    networkError.cause = error
+    networkError.url = url
+    throw networkError
+  }
 }
 
 export const api = {

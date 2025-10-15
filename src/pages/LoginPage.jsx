@@ -44,11 +44,12 @@ export default function LoginPage({ onLogin, onRegister }) {
               ? 'Unable to sign in. Please try again.'
               : 'Unable to create your account. Please try again.')
         )
-        setIsSubmitting(false)
+        return
       }
     } catch (err) {
       console.error(err)
-      setError('An unexpected error occurred. Please try again.')
+      setError(err?.message || 'An unexpected error occurred. Please try again.')
+    } finally {
       setIsSubmitting(false)
     }
   }
