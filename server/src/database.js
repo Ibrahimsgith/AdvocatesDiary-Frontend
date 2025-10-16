@@ -34,6 +34,12 @@ const databaseDir = path.dirname(databasePath)
 
 fs.mkdirSync(databaseDir, { recursive: true })
 
+if (!config.databasePath) {
+  console.warn(
+    `Using default SQLite location at ${databasePath}. Attach a persistent disk and set DATABASE_PATH to retain data across deployments.`
+  )
+}
+
 export const db = new Database(databasePath)
 db.pragma('journal_mode = WAL')
 
