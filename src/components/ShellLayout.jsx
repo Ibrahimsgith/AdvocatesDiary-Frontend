@@ -20,6 +20,7 @@ export default function ShellLayout() {
   const clearError = usePortalData((state) => state.clearError)
   const notice = usePortalData((state) => state.notice)
   const clearNotice = usePortalData((state) => state.clearNotice)
+  const hasCache = usePortalData((state) => state.hasCache)
 
   useEffect(() => {
     if (!hasLoaded && !isLoading) {
@@ -34,6 +35,9 @@ export default function ShellLayout() {
 
   const renderContent = () => {
     if (!hasLoaded) {
+      if (hasCache) {
+        return <Outlet />
+      }
       if (isLoading) {
         return (
           <div className="card p-6 text-sm text-slate-500">Loading the latest portal data…</div>

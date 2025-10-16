@@ -93,6 +93,26 @@ const readLocalData = () => {
   }
 }
 
+const hasPortalContent = (data) => {
+  const snapshot = normalisePortalData(data)
+  if (!snapshot) return false
+
+  if (
+    snapshot.cases.length ||
+    snapshot.clients.length ||
+    snapshot.tasks.length ||
+    snapshot.team.length ||
+    snapshot.resources.length ||
+    snapshot.supportDesks.length
+  ) {
+    return true
+  }
+
+  return Object.values(snapshot.stats || {}).some((value) => Number(value) > 0)
+}
+
+const initialData = readLocalData()
+
 const writeUnsyncedFlag = (value) => {
   const storage = getStorage()
   if (!storage) return
@@ -195,7 +215,10 @@ export const usePortalData = create((set, get) => {
       const current = state.data
       const nextData = normalisePortalData(updater(current))
       persistLocalData(nextData)
-      return { data: nextData }
+      return {
+        data: nextData,
+        hasCache: hasPortalContent(nextData),
+      }
     })
   }
 
@@ -212,12 +235,13 @@ export const usePortalData = create((set, get) => {
   }
 
   return {
-    data: readLocalData(),
+    data: initialData,
     isLoading: false,
     hasLoaded: false,
     error: null,
     notice: '',
     mode: 'unknown',
+    hasCache: hasPortalContent(initialData),
     unsynced: readUnsyncedFlag(),
     clearError() {
       set({ error: null })
@@ -235,7 +259,7 @@ export const usePortalData = create((set, get) => {
           const synced = normalisePortalData(await api.savePortal(snapshot))
           persistLocalData(synced)
           markUnsynced(false)
-          set({ data: synced, mode: 'api', notice: '' })
+          set({ data: synced, mode: 'api', notice: '', hasCache: hasPortalContent(synced) })
         } catch (error) {
           if (isNetworkError(error)) {
             set({
@@ -245,6 +269,7 @@ export const usePortalData = create((set, get) => {
               mode: 'local',
               notice: OFFLINE_NOTICE,
               error: null,
+              hasCache: hasPortalContent(snapshot),
             })
             return snapshot
           }
@@ -269,6 +294,7 @@ export const usePortalData = create((set, get) => {
           mode: 'api',
           notice: '',
           error: null,
+          hasCache: hasPortalContent(data),
         })
         return data
       } catch (error) {
@@ -283,6 +309,7 @@ export const usePortalData = create((set, get) => {
             mode: 'local',
             notice: OFFLINE_NOTICE,
             error: null,
+            hasCache: hasPortalContent(localData),
           })
         } else {
           console.error('Failed to load portal data from API.', error)
@@ -291,6 +318,7 @@ export const usePortalData = create((set, get) => {
             isLoading: false,
             hasLoaded: true,
             error: error.message || 'Unable to load portal data.',
+            hasCache: hasPortalContent(localData),
           })
         }
 
@@ -310,6 +338,7 @@ export const usePortalData = create((set, get) => {
           hasLoaded: true,
           error: null,
           notice: state.mode === 'local' ? OFFLINE_NOTICE : state.notice,
+          hasCache: hasPortalContent(defaults),
         }))
         return
       }
@@ -318,12 +347,12 @@ export const usePortalData = create((set, get) => {
         const saved = normalisePortalData(await api.savePortal(defaults))
         persistLocalData(saved)
         markUnsynced(false)
-        set({ data: saved, hasLoaded: true, error: null, notice: '' })
+        set({ data: saved, hasLoaded: true, error: null, notice: '', hasCache: hasPortalContent(saved) })
       } catch (error) {
         if (isNetworkError(error)) {
           activateOfflineMode()
           markUnsynced(true)
-          set({ data: defaults, hasLoaded: true, error: null })
+          set({ data: defaults, hasLoaded: true, error: null, hasCache: hasPortalContent(defaults) })
           return
         }
         set({ error: error.message || 'Unable to reset portal data.' })
