@@ -328,6 +328,172 @@ export const getPortalData = () => ({
     .map(mapSupportDesk),
 })
 
+const replaceStatsStatement = db.prepare(
+  'INSERT INTO stats (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value'
+)
+
+const replaceCaseStatement = db.prepare(
+  `INSERT INTO cases (id, case_number, client, opponent, practice_area, next_date, status, courtroom, notes, created_at)
+   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+   ON CONFLICT(id) DO UPDATE SET
+     case_number = excluded.case_number,
+     client = excluded.client,
+     opponent = excluded.opponent,
+     practice_area = excluded.practice_area,
+     next_date = excluded.next_date,
+     status = excluded.status,
+     courtroom = excluded.courtroom,
+     notes = excluded.notes,
+     created_at = excluded.created_at`
+)
+
+const replaceClientStatement = db.prepare(
+  `INSERT INTO clients (id, organisation, primary_contact, email, phone, address, notes, created_at)
+   VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+   ON CONFLICT(id) DO UPDATE SET
+     organisation = excluded.organisation,
+     primary_contact = excluded.primary_contact,
+     email = excluded.email,
+     phone = excluded.phone,
+     address = excluded.address,
+     notes = excluded.notes,
+     created_at = excluded.created_at`
+)
+
+const replaceTaskStatement = db.prepare(
+  `INSERT INTO tasks (id, title, owner, due, created_at)
+   VALUES (?, ?, ?, ?, ?)
+   ON CONFLICT(id) DO UPDATE SET
+     title = excluded.title,
+     owner = excluded.owner,
+     due = excluded.due,
+     created_at = excluded.created_at`
+)
+
+const replaceTeamStatement = db.prepare(
+  `INSERT INTO team_members (id, name, role, phone, email, created_at)
+   VALUES (?, ?, ?, ?, ?, ?)
+   ON CONFLICT(id) DO UPDATE SET
+     name = excluded.name,
+     role = excluded.role,
+     phone = excluded.phone,
+     email = excluded.email,
+     created_at = excluded.created_at`
+)
+
+const replaceResourceStatement = db.prepare(
+  `INSERT INTO resources (id, title, type, link, owner, notes, created_at)
+   VALUES (?, ?, ?, ?, ?, ?, ?)
+   ON CONFLICT(id) DO UPDATE SET
+     title = excluded.title,
+     type = excluded.type,
+     link = excluded.link,
+     owner = excluded.owner,
+     notes = excluded.notes,
+     created_at = excluded.created_at`
+)
+
+const replaceSupportDeskStatement = db.prepare(
+  `INSERT INTO support_desks (id, department, phone, email, hours, notes, created_at)
+   VALUES (?, ?, ?, ?, ?, ?, ?)
+   ON CONFLICT(id) DO UPDATE SET
+     department = excluded.department,
+     phone = excluded.phone,
+     email = excluded.email,
+     hours = excluded.hours,
+     notes = excluded.notes,
+     created_at = excluded.created_at`
+)
+
+const clearTableStatements = {
+  cases: db.prepare('DELETE FROM cases'),
+  clients: db.prepare('DELETE FROM clients'),
+  tasks: db.prepare('DELETE FROM tasks'),
+  team: db.prepare('DELETE FROM team_members'),
+  resources: db.prepare('DELETE FROM resources'),
+  supportDesks: db.prepare('DELETE FROM support_desks'),
+}
+
+const replacePortalDataTransaction = db.transaction((payload) => {
+  const stats = normaliseStatsInput(payload.stats)
+  for (const key of STAT_KEYS) {
+    replaceStatsStatement.run(key, stats[key])
+  }
+
+  clearTableStatements.cases.run()
+  for (const item of toArray(payload.cases).map(normaliseCaseInput).filter((item) => item.caseNumber && item.client)) {
+    replaceCaseStatement.run(
+      item.id,
+      item.caseNumber,
+      item.client,
+      item.opponent,
+      item.practiceArea,
+      item.nextDate,
+      item.status,
+      item.courtroom,
+      item.notes,
+      item.createdAt
+    )
+  }
+
+  clearTableStatements.clients.run()
+  for (const item of toArray(payload.clients)
+    .map(normaliseClientInput)
+    .filter((item) => item.organisation)) {
+    replaceClientStatement.run(
+      item.id,
+      item.organisation,
+      item.primaryContact,
+      item.email,
+      item.phone,
+      item.address,
+      item.notes,
+      item.createdAt
+    )
+  }
+
+  clearTableStatements.tasks.run()
+  for (const item of toArray(payload.tasks).map(normaliseTaskInput).filter((item) => item.title && item.owner && item.due)) {
+    replaceTaskStatement.run(item.id, item.title, item.owner, item.due, item.createdAt)
+  }
+
+  clearTableStatements.team.run()
+  for (const item of toArray(payload.team).map(normaliseTeamInput).filter((item) => item.name && item.role)) {
+    replaceTeamStatement.run(item.id, item.name, item.role, item.phone, item.email, item.createdAt)
+  }
+
+  clearTableStatements.resources.run()
+  for (const item of toArray(payload.resources).map(normaliseResourceInput).filter((item) => item.title)) {
+    replaceResourceStatement.run(
+      item.id,
+      item.title,
+      item.type,
+      item.link,
+      item.owner,
+      item.notes,
+      item.createdAt
+    )
+  }
+
+  clearTableStatements.supportDesks.run()
+  for (const item of toArray(payload.supportDesks).map(normaliseSupportDeskInput).filter((item) => item.department)) {
+    replaceSupportDeskStatement.run(
+      item.id,
+      item.department,
+      item.phone,
+      item.email,
+      item.hours,
+      item.notes,
+      item.createdAt
+    )
+  }
+})
+
+export const replacePortalData = (payload = {}) => {
+  replacePortalDataTransaction(payload)
+  return getPortalData()
+}
+
 const insertStatements = {
   cases: db.prepare(
     `INSERT INTO cases (id, case_number, client, opponent, practice_area, next_date, status, courtroom, notes)
@@ -357,6 +523,99 @@ const deleteStatements = {
 }
 
 const newId = () => randomUUID()
+
+const numberOrZero = (value) => {
+  const parsed = Number(value)
+  return Number.isFinite(parsed) ? parsed : 0
+}
+
+const normaliseOptional = (value) => {
+  if (value === null || value === undefined) return null
+  const trimmed = String(value).trim()
+  return trimmed.length ? trimmed : null
+}
+
+const ensureTimestamp = (value) => {
+  if (!value) return new Date().toISOString()
+  const date = new Date(value)
+  return Number.isNaN(date.getTime()) ? new Date().toISOString() : date.toISOString()
+}
+
+const ensureId = (value) => {
+  const trimmed = typeof value === 'string' ? value.trim() : ''
+  return trimmed || newId()
+}
+
+const normaliseStatsInput = (value = {}) => {
+  const stats = {}
+  for (const key of STAT_KEYS) {
+    stats[key] = numberOrZero(value[key])
+  }
+  return stats
+}
+
+const normaliseCaseInput = (value = {}) => ({
+  id: ensureId(value.id),
+  caseNumber: String(value.caseNumber || value.case_number || '').trim(),
+  client: String(value.client || '').trim(),
+  opponent: normaliseOptional(value.opponent || value.opponent_name),
+  practiceArea: normaliseOptional(value.practiceArea || value.practice_area),
+  nextDate: normaliseOptional(value.nextDate || value.next_date),
+  status: normaliseOptional(value.status),
+  courtroom: normaliseOptional(value.courtroom),
+  notes: normaliseOptional(value.notes),
+  createdAt: ensureTimestamp(value.createdAt || value.created_at),
+})
+
+const normaliseClientInput = (value = {}) => ({
+  id: ensureId(value.id),
+  organisation: String(value.organisation || value.name || '').trim(),
+  primaryContact: normaliseOptional(value.primaryContact || value.primary_contact),
+  email: normaliseOptional(value.email),
+  phone: normaliseOptional(value.phone),
+  address: normaliseOptional(value.address),
+  notes: normaliseOptional(value.notes),
+  createdAt: ensureTimestamp(value.createdAt || value.created_at),
+})
+
+const normaliseTaskInput = (value = {}) => ({
+  id: ensureId(value.id),
+  title: String(value.title || '').trim(),
+  owner: String(value.owner || '').trim(),
+  due: normaliseOptional(value.due),
+  createdAt: ensureTimestamp(value.createdAt || value.created_at),
+})
+
+const normaliseTeamInput = (value = {}) => ({
+  id: ensureId(value.id),
+  name: String(value.name || '').trim(),
+  role: String(value.role || '').trim(),
+  phone: normaliseOptional(value.phone),
+  email: normaliseOptional(value.email),
+  createdAt: ensureTimestamp(value.createdAt || value.created_at),
+})
+
+const normaliseResourceInput = (value = {}) => ({
+  id: ensureId(value.id),
+  title: String(value.title || '').trim(),
+  type: normaliseOptional(value.type),
+  link: normaliseOptional(value.link),
+  owner: normaliseOptional(value.owner),
+  notes: normaliseOptional(value.notes),
+  createdAt: ensureTimestamp(value.createdAt || value.created_at),
+})
+
+const normaliseSupportDeskInput = (value = {}) => ({
+  id: ensureId(value.id),
+  department: String(value.department || '').trim(),
+  phone: normaliseOptional(value.phone),
+  email: normaliseOptional(value.email),
+  hours: normaliseOptional(value.hours),
+  notes: normaliseOptional(value.notes),
+  createdAt: ensureTimestamp(value.createdAt || value.created_at),
+})
+
+const toArray = (value) => (Array.isArray(value) ? value : [])
 
 export const createCase = (payload) => {
   const id = newId()

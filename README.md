@@ -22,6 +22,24 @@ npm --prefix server install
    ```
    The server listens on the configured `PORT` (4000 by default) and stores its SQLite database in `server/data/pasha-law-senate.db`.
 
+### Docker deployment
+The `server/Dockerfile` packages the Express API with the SQLite CLI and the build toolchain required for the `better-sqlite3` dependency. Build and run the container from the repository root:
+
+```bash
+docker build -t pasha-law-senate-api server
+docker run --rm -p 4000:4000 --env-file server/.env pasha-law-senate-api
+```
+
+To persist the SQLite database outside the container, mount a host volume and point `DATABASE_PATH` at the mounted location:
+
+```bash
+docker run --rm -p 4000:4000 \
+  --env-file server/.env \
+  -v $(pwd)/server/data:/data \
+  -e DATABASE_PATH=/data/pasha-law-senate.db \
+  pasha-law-senate-api
+```
+
 ## Front-end configuration
 The client automatically targets `http://localhost:4000` when no API base URL is supplied. To point the UI at a different host, create a `.env.local` file with:
 
@@ -46,6 +64,27 @@ This command compiles the React application into static assets under `dist/`.
 
 ## API reference
 The backend exposes REST endpoints under `/api` for authentication, metrics, cases, clients, tasks, team contacts, resources, and support desks. See `server/src/server.js` for the full route list.
+
+## Database internals
+The Express API persists all portal data to a SQLite database located at `server/data/pasha-law-senate.db` by default (or the path
+provided via `DATABASE_PATH`). The schema is managed in `server/src/database.js` and includes the following tables:
+
+- `users` & `sessions` – store staff credentials with salted+hashed passwords and active session tokens.
+- `stats` – key/value metrics for dashboard KPIs such as active matters, hearings this week, pending filings, and team utilisation.
+- `cases`, `clients`, `tasks`, `team_members`, `resources`, `support_desks` – structured records for the operational data that powers
+  each portal page.
+
+The module exposes helpers that:
+
+- Seed default KPI keys and the initial administrator account (`seedDefaults`).
+- Create, lookup, and destroy user sessions as well as verify passwords with `scrypt`-based hashing.
+- Fetch the complete portal dataset (`getPortalData`) and normalise it before returning it to the client.
+- Upsert entire datasets in a single transaction (`replacePortalData`) so offline changes can be synced back to the server safely.
+- Provide fine-grained CRUD helpers (`createCase`, `createClient`, `createTask`, `createTeamMember`, `createResource`,
+  `createSupportDesk`, and matching `remove*` helpers) used by the REST routes.
+
+All mutation helpers validate and sanitise inputs—ensuring IDs, timestamps, and optional fields are populated consistently—before
+writing them to SQLite. This keeps the database resilient whether the data originates from the live API or a later offline sync.
 
 ## Deploying the backend to Render
 The repository includes a `render.yaml` blueprint for provisioning the API. The default blueprint targets the free plan so it leaves
