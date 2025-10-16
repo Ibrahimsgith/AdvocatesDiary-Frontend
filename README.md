@@ -97,7 +97,9 @@ To deploy manually:
 1. Create a new **Web Service** from this repository and point the root directory to `server`.
 2. Use `npm install` as the build command and `npm run start` as the start command.
 3. Add the following environment variables:
-   - `CLIENT_ORIGIN` pointing at your front-end host (for example, the Render static site URL).
+   - `CLIENT_ORIGIN` pointing at your front-end host (for example, the Render static site URL). You can provide multiple
+     origins by separating them with commas (e.g. `https://app.example.com,https://staging.example.com`) or use `*` to allow
+     any origin when testing.
    - Optionally override `DATABASE_PATH` (only required when a disk is attached), `ADMIN_EMAIL`, `ADMIN_PASSWORD`, and
      `SESSION_TTL_HOURS`.
 4. Deploy the service. If no disk is attached, data lives on the ephemeral filesystem and resets when the service redeploys. With a
@@ -107,8 +109,9 @@ When hosting the React app separately (such as a Render Static Site), set `VITE_
 API's public URL so requests are sent to the live backend.
 
 ### Troubleshooting Render deploys
-- **Build succeeds but requests still hit offline mode** – double-check `VITE_API_BASE_URL` on the front-end and `CLIENT_ORIGIN` on
-  the API match the deployed domains. The UI falls back to local storage whenever it cannot reach the backend.
+- **Build succeeds but requests still hit offline mode** – double-check `VITE_API_BASE_URL` on the front-end and the entries in
+  `CLIENT_ORIGIN` on the API match the deployed domains (remove trailing slashes when configuring them). The UI falls back to
+  local storage whenever it cannot reach the backend.
 - **Disk configuration errors** – Render blocks persistent disks on the free plan. Deploy without a disk or upgrade the service plan
   before reapplying a disk-backed blueprint.
 - **Native module build failures** – `better-sqlite3` needs build tools available. Render’s Node environment includes them by default,

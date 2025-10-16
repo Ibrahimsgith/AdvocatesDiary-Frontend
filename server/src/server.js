@@ -30,9 +30,28 @@ seedDefaults()
 const app = express()
 
 app.use(helmet())
+
+const allowedOrigins = config.clientOrigins
+const allowAnyOrigin = config.allowAnyOrigin
+
 app.use(
   cors({
-    origin: config.clientOrigin,
+    origin(origin, callback) {
+      if (!origin) {
+        return callback(null, true)
+      }
+
+      if (allowAnyOrigin) {
+        return callback(null, true)
+      }
+
+      const normalisedOrigin = origin.replace(/\/$/, '')
+      if (allowedOrigins.includes(normalisedOrigin)) {
+        return callback(null, true)
+      }
+
+      return callback(new Error(`Origin ${origin} is not allowed by CORS.`))
+    },
     credentials: false,
   })
 )
