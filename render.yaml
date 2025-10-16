@@ -1,0 +1,13 @@
+services:
+  - type: web
+    name: pasha-law-senate-api
+    env: node
+    rootDir: server
+    plan: free
+    buildCommand: npm install
+    startCommand: npm run start
+    envVars:
+      - key: NODE_VERSION
+        value: 18
+      - key: CLIENT_ORIGIN
+        value: https://your-frontend-host.example
