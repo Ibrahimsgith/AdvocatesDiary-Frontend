@@ -91,11 +91,6 @@ export const api = {
     }),
   getSession: () => request('/api/auth/session'),
   getPortal: () => request('/api/portal'),
-  savePortal: (payload) =>
-    request('/api/portal', {
-      method: 'PUT',
-      body: JSON.stringify(payload),
-    }),
   updateStats: (stats) =>
     request('/api/portal/stats', {
       method: 'PUT',

@@ -22,7 +22,6 @@ import {
   removeResource,
   createSupportDesk,
   removeSupportDesk,
-  replacePortalData,
 } from './database.js'
 
 seedDefaults()
@@ -106,14 +105,6 @@ app.get(
   '/api/portal',
   asyncHandler((req, res) => {
     res.json(getPortalData())
-  })
-)
-
-app.put(
-  '/api/portal',
-  asyncHandler((req, res) => {
-    const updated = replacePortalData(req.body || {})
-    res.json(updated)
   })
 )
 

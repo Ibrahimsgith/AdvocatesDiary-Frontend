@@ -2,7 +2,6 @@ import { create } from 'zustand'
 import { api } from '../lib/api'
 
 const STORAGE_KEY = 'pls-portal-data'
-const UNSYNCED_KEY = 'pls-portal-unsynced'
 const OFFLINE_NOTICE =
   'The portal server is unavailable. Changes will be stored locally in this browser until a connection is restored.'
 
@@ -93,22 +92,6 @@ const readLocalData = () => {
   }
 }
 
-const writeUnsyncedFlag = (value) => {
-  const storage = getStorage()
-  if (!storage) return
-  if (value) {
-    storage.setItem(UNSYNCED_KEY, '1')
-  } else {
-    storage.removeItem(UNSYNCED_KEY)
-  }
-}
-
-const readUnsyncedFlag = () => {
-  const storage = getStorage()
-  if (!storage) return false
-  return storage.getItem(UNSYNCED_KEY) === '1'
-}
-
 const generateId = () => {
   if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
     return crypto.randomUUID()
@@ -185,11 +168,6 @@ const createLocalSupportDesk = (payload) => ({
 })
 
 export const usePortalData = create((set, get) => {
-  const markUnsynced = (value) => {
-    writeUnsyncedFlag(value)
-    set({ unsynced: value })
-  }
-
   const applyLocalUpdate = (updater) => {
     set((state) => {
       const current = state.data
@@ -212,13 +190,12 @@ export const usePortalData = create((set, get) => {
   }
 
   return {
-    data: readLocalData(),
+    data: createDefaultData(),
     isLoading: false,
     hasLoaded: false,
     error: null,
     notice: '',
     mode: 'unknown',
-    unsynced: readUnsyncedFlag(),
     clearError() {
       set({ error: null })
     },
@@ -228,52 +205,17 @@ export const usePortalData = create((set, get) => {
     async load() {
       if (get().isLoading) return
       set({ isLoading: true, error: null })
-      const snapshot = normalisePortalData(get().data)
-
-      if (get().unsynced) {
-        try {
-          const synced = normalisePortalData(await api.savePortal(snapshot))
-          persistLocalData(synced)
-          markUnsynced(false)
-          set({ data: synced, mode: 'api', notice: '' })
-        } catch (error) {
-          if (isNetworkError(error)) {
-            set({
-              data: snapshot,
-              isLoading: false,
-              hasLoaded: true,
-              mode: 'local',
-              notice: OFFLINE_NOTICE,
-              error: null,
-            })
-            return snapshot
-          }
-
-          set({
-            isLoading: false,
-            error: error.message || 'Unable to sync offline changes.',
-          })
-          throw error
-        }
-      }
-
       try {
         const response = await api.getPortal()
         const data = normalisePortalData(response)
         persistLocalData(data)
-        markUnsynced(false)
-        set({
-          data,
-          isLoading: false,
-          hasLoaded: true,
-          mode: 'api',
-          notice: '',
-          error: null,
-        })
+        set({ data, isLoading: false, hasLoaded: true, mode: 'api', notice: '' })
         return data
       } catch (error) {
         const localData = readLocalData()
         persistLocalData(localData)
+        const currentMode = get().mode
+
         if (isNetworkError(error)) {
           console.warn('Falling back to offline portal data.', error)
           set({
@@ -290,6 +232,8 @@ export const usePortalData = create((set, get) => {
             data: localData,
             isLoading: false,
             hasLoaded: true,
+            mode: currentMode === 'local' ? 'local' : 'api',
+            notice: currentMode === 'local' ? OFFLINE_NOTICE : '',
             error: error.message || 'Unable to load portal data.',
           })
         }
@@ -303,32 +247,12 @@ export const usePortalData = create((set, get) => {
     async reset() {
       const defaults = createDefaultData()
       persistLocalData(defaults)
-      if (get().mode === 'local') {
-        markUnsynced(true)
-        set((state) => ({
-          data: defaults,
-          hasLoaded: true,
-          error: null,
-          notice: state.mode === 'local' ? OFFLINE_NOTICE : state.notice,
-        }))
-        return
-      }
-
-      try {
-        const saved = normalisePortalData(await api.savePortal(defaults))
-        persistLocalData(saved)
-        markUnsynced(false)
-        set({ data: saved, hasLoaded: true, error: null, notice: '' })
-      } catch (error) {
-        if (isNetworkError(error)) {
-          activateOfflineMode()
-          markUnsynced(true)
-          set({ data: defaults, hasLoaded: true, error: null })
-          return
-        }
-        set({ error: error.message || 'Unable to reset portal data.' })
-        throw error
-      }
+      set((state) => ({
+        data: defaults,
+        hasLoaded: true,
+        error: null,
+        notice: state.mode === 'local' ? OFFLINE_NOTICE : state.notice,
+      }))
     },
     async updateStats(patch) {
       set({ error: null })
@@ -340,7 +264,6 @@ export const usePortalData = create((set, get) => {
 
       if (get().mode === 'local') {
         apply(patch)
-        markUnsynced(true)
         return
       }
 
@@ -351,7 +274,6 @@ export const usePortalData = create((set, get) => {
         if (isNetworkError(error)) {
           activateOfflineMode()
           apply(patch)
-          markUnsynced(true)
           return
         }
         set({ error: error.message || 'Unable to update metrics.' })
@@ -370,7 +292,6 @@ export const usePortalData = create((set, get) => {
       if (get().mode === 'local') {
         const localItem = createLocalCase(values)
         pushLocal(localItem)
-        markUnsynced(true)
         return localItem.id
       }
 
@@ -384,7 +305,6 @@ export const usePortalData = create((set, get) => {
           activateOfflineMode()
           const localItem = createLocalCase(values)
           pushLocal(localItem)
-          markUnsynced(true)
           return localItem.id
         }
         set({ error: error.message || 'Unable to add case.' })
@@ -402,7 +322,6 @@ export const usePortalData = create((set, get) => {
 
       if (get().mode === 'local') {
         removeLocal()
-        markUnsynced(true)
         return
       }
 
@@ -413,7 +332,6 @@ export const usePortalData = create((set, get) => {
         if (isNetworkError(error)) {
           activateOfflineMode()
           removeLocal()
-          markUnsynced(true)
           return
         }
         set({ error: error.message || 'Unable to remove case.' })
@@ -432,7 +350,6 @@ export const usePortalData = create((set, get) => {
       if (get().mode === 'local') {
         const localItem = createLocalClient(values)
         pushLocal(localItem)
-        markUnsynced(true)
         return localItem.id
       }
 
@@ -446,7 +363,6 @@ export const usePortalData = create((set, get) => {
           activateOfflineMode()
           const localItem = createLocalClient(values)
           pushLocal(localItem)
-          markUnsynced(true)
           return localItem.id
         }
         set({ error: error.message || 'Unable to add client.' })
@@ -464,7 +380,6 @@ export const usePortalData = create((set, get) => {
 
       if (get().mode === 'local') {
         removeLocal()
-        markUnsynced(true)
         return
       }
 
@@ -475,7 +390,6 @@ export const usePortalData = create((set, get) => {
         if (isNetworkError(error)) {
           activateOfflineMode()
           removeLocal()
-          markUnsynced(true)
           return
         }
         set({ error: error.message || 'Unable to remove client.' })
@@ -494,7 +408,6 @@ export const usePortalData = create((set, get) => {
       if (get().mode === 'local') {
         const localItem = createLocalTask(values)
         pushLocal(localItem)
-        markUnsynced(true)
         return localItem.id
       }
 
@@ -508,7 +421,6 @@ export const usePortalData = create((set, get) => {
           activateOfflineMode()
           const localItem = createLocalTask(values)
           pushLocal(localItem)
-          markUnsynced(true)
           return localItem.id
         }
         set({ error: error.message || 'Unable to add task.' })
@@ -526,7 +438,6 @@ export const usePortalData = create((set, get) => {
 
       if (get().mode === 'local') {
         removeLocal()
-        markUnsynced(true)
         return
       }
 
@@ -537,7 +448,6 @@ export const usePortalData = create((set, get) => {
         if (isNetworkError(error)) {
           activateOfflineMode()
           removeLocal()
-          markUnsynced(true)
           return
         }
         set({ error: error.message || 'Unable to remove task.' })
@@ -556,7 +466,6 @@ export const usePortalData = create((set, get) => {
       if (get().mode === 'local') {
         const localItem = createLocalTeamMember(values)
         pushLocal(localItem)
-        markUnsynced(true)
         return localItem.id
       }
 
@@ -570,7 +479,6 @@ export const usePortalData = create((set, get) => {
           activateOfflineMode()
           const localItem = createLocalTeamMember(values)
           pushLocal(localItem)
-          markUnsynced(true)
           return localItem.id
         }
         set({ error: error.message || 'Unable to add team member.' })
@@ -588,7 +496,6 @@ export const usePortalData = create((set, get) => {
 
       if (get().mode === 'local') {
         removeLocal()
-        markUnsynced(true)
         return
       }
 
@@ -599,7 +506,6 @@ export const usePortalData = create((set, get) => {
         if (isNetworkError(error)) {
           activateOfflineMode()
           removeLocal()
-          markUnsynced(true)
           return
         }
         set({ error: error.message || 'Unable to remove team member.' })
@@ -618,7 +524,6 @@ export const usePortalData = create((set, get) => {
       if (get().mode === 'local') {
         const localItem = createLocalResource(values)
         pushLocal(localItem)
-        markUnsynced(true)
         return localItem.id
       }
 
@@ -632,7 +537,6 @@ export const usePortalData = create((set, get) => {
           activateOfflineMode()
           const localItem = createLocalResource(values)
           pushLocal(localItem)
-          markUnsynced(true)
           return localItem.id
         }
         set({ error: error.message || 'Unable to add resource.' })
@@ -650,7 +554,6 @@ export const usePortalData = create((set, get) => {
 
       if (get().mode === 'local') {
         removeLocal()
-        markUnsynced(true)
         return
       }
 
@@ -661,7 +564,6 @@ export const usePortalData = create((set, get) => {
         if (isNetworkError(error)) {
           activateOfflineMode()
           removeLocal()
-          markUnsynced(true)
           return
         }
         set({ error: error.message || 'Unable to remove resource.' })
@@ -680,7 +582,6 @@ export const usePortalData = create((set, get) => {
       if (get().mode === 'local') {
         const localItem = createLocalSupportDesk(values)
         pushLocal(localItem)
-        markUnsynced(true)
         return localItem.id
       }
 
@@ -694,7 +595,6 @@ export const usePortalData = create((set, get) => {
           activateOfflineMode()
           const localItem = createLocalSupportDesk(values)
           pushLocal(localItem)
-          markUnsynced(true)
           return localItem.id
         }
         set({ error: error.message || 'Unable to add support desk.' })
@@ -712,7 +612,6 @@ export const usePortalData = create((set, get) => {
 
       if (get().mode === 'local') {
         removeLocal()
-        markUnsynced(true)
         return
       }
 
@@ -723,7 +622,6 @@ export const usePortalData = create((set, get) => {
         if (isNetworkError(error)) {
           activateOfflineMode()
           removeLocal()
-          markUnsynced(true)
           return
         }
         set({ error: error.message || 'Unable to remove support desk.' })
