@@ -31,7 +31,41 @@ const mergeStats = (current, patch = {}) => {
 
 const normaliseCollection = (value) => (Array.isArray(value) ? value : [])
 
+const DEFAULT_PROFILE_NAME = 'Pasha Law Senate'
+
+const createDefaultProfile = () => ({
+  name: DEFAULT_PROFILE_NAME,
+  email: '',
+  phone: '',
+  website: '',
+  address: '',
+  notes: '',
+  updatedAt: '',
+})
+
+const normaliseProfile = (value = {}) => {
+  const profile = createDefaultProfile()
+  return {
+    name: value.name ? String(value.name).trim() || profile.name : profile.name,
+    email: value.email ? String(value.email).trim() : '',
+    phone: value.phone ? String(value.phone).trim() : '',
+    website: value.website ? String(value.website).trim() : '',
+    address: value.address ? String(value.address).trim() : '',
+    notes: value.notes ? String(value.notes).trim() : '',
+    updatedAt: value.updatedAt || '',
+  }
+}
+
+const mergeProfile = (current, patch = {}) => {
+  const base = normaliseProfile(current)
+  return normaliseProfile({
+    ...base,
+    ...patch,
+  })
+}
+
 const createDefaultData = () => ({
+  profile: createDefaultProfile(),
   stats: normaliseStats(),
   cases: [],
   clients: [],
@@ -46,6 +80,7 @@ const normalisePortalData = (value) => {
     return createDefaultData()
   }
   return {
+    profile: normaliseProfile(value.profile),
     stats: normaliseStats(value.stats),
     cases: normaliseCollection(value.cases),
     clients: normaliseCollection(value.clients),
@@ -98,6 +133,13 @@ const hasPortalContent = (data) => {
   if (!snapshot) return false
 
   if (
+    (snapshot.profile &&
+      (snapshot.profile.name && snapshot.profile.name !== DEFAULT_PROFILE_NAME)) ||
+    snapshot.profile?.email ||
+    snapshot.profile?.phone ||
+    snapshot.profile?.website ||
+    snapshot.profile?.address ||
+    snapshot.profile?.notes ||
     snapshot.cases.length ||
     snapshot.clients.length ||
     snapshot.tasks.length ||
@@ -384,6 +426,36 @@ export const usePortalData = create((set, get) => {
           return
         }
         set({ error: error.message || 'Unable to update metrics.' })
+        throw error
+      }
+    },
+    async updateProfile(patch) {
+      set({ error: null })
+      const apply = (input) =>
+        applyLocalUpdate((data) => ({
+          ...data,
+          profile: mergeProfile(data.profile, input),
+        }))
+
+      const timestamped = { ...patch, updatedAt: timestamp() }
+
+      if (get().mode === 'local') {
+        apply(timestamped)
+        markUnsynced(true)
+        return
+      }
+
+      try {
+        const response = await api.updateProfile(patch)
+        apply(response.profile)
+      } catch (error) {
+        if (isNetworkError(error)) {
+          activateOfflineMode()
+          apply(timestamped)
+          markUnsynced(true)
+          return
+        }
+        set({ error: error.message || 'Unable to update firm profile.' })
         throw error
       }
     },

@@ -21,6 +21,7 @@ export default function ShellLayout() {
   const notice = usePortalData((state) => state.notice)
   const clearNotice = usePortalData((state) => state.clearNotice)
   const hasCache = usePortalData((state) => state.hasCache)
+  const firmName = usePortalData((state) => state.data.profile.name)
 
   useEffect(() => {
     if (!hasLoaded && !isLoading) {
@@ -69,7 +70,7 @@ export default function ShellLayout() {
               {mobileOpen ? <X size={18} /> : <Menu size={18} />}
             </button>
             <Link to="/dashboard" className="text-lg font-semibold tracking-tight">
-              Pasha Law Senate
+              {firmName || 'Pasha Law Senate'}
             </Link>
           </div>
           <div className="hidden md:flex items-center gap-6 text-sm font-medium">

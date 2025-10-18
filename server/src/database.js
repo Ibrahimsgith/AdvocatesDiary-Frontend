@@ -40,6 +40,8 @@ if (!config.databasePath) {
   )
 }
 
+export const databaseFilePath = databasePath
+
 export const db = new Database(databasePath)
 db.pragma('journal_mode = WAL')
 
@@ -125,6 +127,17 @@ db.exec(`
     notes TEXT,
     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
   );
+
+  CREATE TABLE IF NOT EXISTS firm_profile (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    email TEXT,
+    phone TEXT,
+    website TEXT,
+    address TEXT,
+    notes TEXT,
+    updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+  );
 `)
 
 const STAT_KEYS = ['activeMatters', 'hearingsThisWeek', 'filingsPending', 'teamUtilisation']
@@ -134,6 +147,9 @@ const hashPassword = (password) => {
   const hashed = scryptSync(password, salt, 64)
   return `${salt.toString('hex')}:${hashed.toString('hex')}`
 }
+
+const DEFAULT_PROFILE_ID = 'default-profile'
+const DEFAULT_PROFILE_NAME = 'Pasha Law Senate'
 
 export const seedDefaults = () => {
   const insertStat = db.prepare('INSERT OR IGNORE INTO stats (key, value) VALUES (?, 0)')
@@ -149,6 +165,14 @@ export const seedDefaults = () => {
       adminEmail,
       passwordHash,
       'Pasha Law Senate Admin'
+    )
+  }
+
+  const existingProfile = db.prepare('SELECT id FROM firm_profile WHERE id = ?').get(DEFAULT_PROFILE_ID)
+  if (!existingProfile) {
+    db.prepare('INSERT INTO firm_profile (id, name) VALUES (?, ?)').run(
+      DEFAULT_PROFILE_ID,
+      DEFAULT_PROFILE_NAME
     )
   }
 }
@@ -306,26 +330,26 @@ const mapSupportDesk = (row) => ({
   createdAt: row.created_at,
 })
 
-export const getPortalData = () => ({
-  stats: getStats(),
-  cases: selectAll('cases')
-    .all()
-    .map(mapCase),
-  clients: selectAll('clients')
-    .all()
-    .map(mapClient),
-  tasks: selectAll('tasks')
-    .all()
-    .map(mapTask),
-  team: selectAll('team_members')
-    .all()
-    .map(mapTeamMember),
-  resources: selectAll('resources')
-    .all()
-    .map(mapResource),
-  supportDesks: selectAll('support_desks')
-    .all()
-    .map(mapSupportDesk),
+const mapProfile = (row) => ({
+  id: row.id,
+  name: row.name,
+  email: row.email || '',
+  phone: row.phone || '',
+  website: row.website || '',
+  address: row.address || '',
+  notes: row.notes || '',
+  updatedAt: row.updated_at,
+})
+
+const createDefaultProfile = () => ({
+  id: DEFAULT_PROFILE_ID,
+  name: DEFAULT_PROFILE_NAME,
+  email: '',
+  phone: '',
+  website: '',
+  address: '',
+  notes: '',
+  updatedAt: new Date().toISOString(),
 })
 
 const replaceStatsStatement = db.prepare(
@@ -405,6 +429,21 @@ const replaceSupportDeskStatement = db.prepare(
      created_at = excluded.created_at`
 )
 
+const upsertProfileStatement = db.prepare(`
+  INSERT INTO firm_profile (id, name, email, phone, website, address, notes, updated_at)
+  VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+  ON CONFLICT(id) DO UPDATE SET
+    name = excluded.name,
+    email = excluded.email,
+    phone = excluded.phone,
+    website = excluded.website,
+    address = excluded.address,
+    notes = excluded.notes,
+    updated_at = excluded.updated_at
+`)
+
+const selectProfileStatement = db.prepare('SELECT * FROM firm_profile WHERE id = ?')
+
 const clearTableStatements = {
   cases: db.prepare('DELETE FROM cases'),
   clients: db.prepare('DELETE FROM clients'),
@@ -418,6 +457,20 @@ const replacePortalDataTransaction = db.transaction((payload) => {
   const stats = normaliseStatsInput(payload.stats)
   for (const key of STAT_KEYS) {
     replaceStatsStatement.run(key, stats[key])
+  }
+
+  if (payload.profile) {
+    const profile = normaliseProfileInput(payload.profile)
+    upsertProfileStatement.run(
+      profile.id,
+      profile.name,
+      profile.email,
+      profile.phone,
+      profile.website,
+      profile.address,
+      profile.notes,
+      profile.updatedAt
+    )
   }
 
   clearTableStatements.cases.run()
@@ -493,6 +546,57 @@ export const replacePortalData = (payload = {}) => {
   replacePortalDataTransaction(payload)
   return getPortalData()
 }
+
+export const getFirmProfile = () => {
+  const row = selectProfileStatement.get(DEFAULT_PROFILE_ID)
+  return row ? mapProfile(row) : createDefaultProfile()
+}
+
+export const updateFirmProfile = (payload = {}) => {
+  const current = getFirmProfile()
+  const merged = normaliseProfileInput({
+    ...current,
+    ...payload,
+    id: current.id || DEFAULT_PROFILE_ID,
+    updatedAt: payload.updatedAt || new Date().toISOString(),
+  })
+
+  upsertProfileStatement.run(
+    merged.id,
+    merged.name,
+    merged.email,
+    merged.phone,
+    merged.website,
+    merged.address,
+    merged.notes,
+    merged.updatedAt
+  )
+
+  return getFirmProfile()
+}
+
+export const getPortalData = () => ({
+  profile: getFirmProfile(),
+  stats: getStats(),
+  cases: selectAll('cases')
+    .all()
+    .map(mapCase),
+  clients: selectAll('clients')
+    .all()
+    .map(mapClient),
+  tasks: selectAll('tasks')
+    .all()
+    .map(mapTask),
+  team: selectAll('team_members')
+    .all()
+    .map(mapTeamMember),
+  resources: selectAll('resources')
+    .all()
+    .map(mapResource),
+  supportDesks: selectAll('support_desks')
+    .all()
+    .map(mapSupportDesk),
+})
 
 const insertStatements = {
   cases: db.prepare(
@@ -614,6 +718,21 @@ const normaliseSupportDeskInput = (value = {}) => ({
   notes: normaliseOptional(value.notes),
   createdAt: ensureTimestamp(value.createdAt || value.created_at),
 })
+
+const normaliseProfileInput = (value = {}) => {
+  const id = String(value.id || DEFAULT_PROFILE_ID).trim() || DEFAULT_PROFILE_ID
+  const name = String(value.name || DEFAULT_PROFILE_NAME).trim() || DEFAULT_PROFILE_NAME
+  return {
+    id,
+    name,
+    email: normaliseOptional(value.email),
+    phone: normaliseOptional(value.phone),
+    website: normaliseOptional(value.website),
+    address: normaliseOptional(value.address),
+    notes: normaliseOptional(value.notes),
+    updatedAt: ensureTimestamp(value.updatedAt || value.updated_at),
+  }
+}
 
 const toArray = (value) => (Array.isArray(value) ? value : [])
 

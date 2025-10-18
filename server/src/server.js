@@ -23,6 +23,7 @@ import {
   createSupportDesk,
   removeSupportDesk,
   replacePortalData,
+  updateFirmProfile,
 } from './database.js'
 
 seedDefaults()
@@ -147,6 +148,14 @@ app.put(
       }
     }
     res.json({ stats })
+  })
+)
+
+app.put(
+  '/api/profile',
+  asyncHandler((req, res) => {
+    const profile = updateFirmProfile(req.body || {})
+    res.json({ profile })
   })
 )
 

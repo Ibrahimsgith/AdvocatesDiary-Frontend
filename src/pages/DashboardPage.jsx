@@ -16,6 +16,15 @@ const defaultStatForm = {
   teamUtilisation: '',
 }
 
+const defaultProfileForm = {
+  name: '',
+  email: '',
+  phone: '',
+  website: '',
+  address: '',
+  notes: '',
+}
+
 const defaultTaskForm = {
   title: '',
   owner: '',
@@ -30,24 +39,39 @@ const defaultTeamForm = {
 }
 
 export default function DashboardPage() {
+  const profile = usePortalData((state) => state.data.profile)
   const stats = usePortalData((state) => state.data.stats)
   const cases = usePortalData((state) => state.data.cases)
   const tasks = usePortalData((state) => state.data.tasks)
   const team = usePortalData((state) => state.data.team)
+  const updateProfile = usePortalData((state) => state.updateProfile)
   const updateStats = usePortalData((state) => state.updateStats)
   const addTask = usePortalData((state) => state.addTask)
   const removeTask = usePortalData((state) => state.removeTask)
   const addTeamMember = usePortalData((state) => state.addTeamMember)
   const removeTeamMember = usePortalData((state) => state.removeTeamMember)
 
+  const [profileForm, setProfileForm] = useState(defaultProfileForm)
   const [statForm, setStatForm] = useState(defaultStatForm)
   const [taskForm, setTaskForm] = useState(defaultTaskForm)
   const [teamForm, setTeamForm] = useState(defaultTeamForm)
+  const [isSavingProfile, setIsSavingProfile] = useState(false)
   const [isSavingStats, setIsSavingStats] = useState(false)
   const [isSavingTask, setIsSavingTask] = useState(false)
   const [isSavingTeam, setIsSavingTeam] = useState(false)
   const [removingTaskId, setRemovingTaskId] = useState(null)
   const [removingTeamId, setRemovingTeamId] = useState(null)
+
+  useEffect(() => {
+    setProfileForm({
+      name: profile.name ?? '',
+      email: profile.email ?? '',
+      phone: profile.phone ?? '',
+      website: profile.website ?? '',
+      address: profile.address ?? '',
+      notes: profile.notes ?? '',
+    })
+  }, [profile])
 
   useEffect(() => {
     setStatForm({
@@ -69,6 +93,24 @@ export default function DashboardPage() {
   const handleStatChange = (event) => {
     const { name, value } = event.target
     setStatForm((prev) => ({ ...prev, [name]: value }))
+  }
+
+  const handleProfileChange = (event) => {
+    const { name, value } = event.target
+    setProfileForm((prev) => ({ ...prev, [name]: value }))
+  }
+
+  const handleProfileSubmit = async (event) => {
+    event.preventDefault()
+    if (!profileForm.name.trim()) return
+    setIsSavingProfile(true)
+    try {
+      await updateProfile(profileForm)
+    } catch (error) {
+      console.error('Failed to update firm profile', error)
+    } finally {
+      setIsSavingProfile(false)
+    }
   }
 
   const handleStatsSubmit = async (event) => {
@@ -150,6 +192,91 @@ export default function DashboardPage() {
 
   return (
     <div className="space-y-8">
+      <section className="card p-6 space-y-4">
+        <header className="space-y-1">
+          <h2 className="text-lg font-semibold">Firm profile</h2>
+          <p className="text-sm text-slate-500">
+            Share your contact information so staff and clients know how to reach you.
+          </p>
+        </header>
+        <form className="grid gap-4 md:grid-cols-2" onSubmit={handleProfileSubmit}>
+          <label className="space-y-2 text-sm md:col-span-2">
+            <span className="block font-medium text-slate-600 dark:text-slate-300">Firm name</span>
+            <input
+              name="name"
+              className="input"
+              value={profileForm.name}
+              onChange={handleProfileChange}
+              placeholder="Pasha Law Senate"
+              required
+            />
+          </label>
+          <label className="space-y-2 text-sm">
+            <span className="block font-medium text-slate-600 dark:text-slate-300">Email</span>
+            <input
+              name="email"
+              type="email"
+              className="input"
+              value={profileForm.email}
+              onChange={handleProfileChange}
+              placeholder="contact@pashalawsenate.com"
+            />
+          </label>
+          <label className="space-y-2 text-sm">
+            <span className="block font-medium text-slate-600 dark:text-slate-300">Phone</span>
+            <input
+              name="phone"
+              className="input"
+              value={profileForm.phone}
+              onChange={handleProfileChange}
+              placeholder="+1 (555) 123-4567"
+            />
+          </label>
+          <label className="space-y-2 text-sm">
+            <span className="block font-medium text-slate-600 dark:text-slate-300">Website</span>
+            <input
+              name="website"
+              className="input"
+              value={profileForm.website}
+              onChange={handleProfileChange}
+              placeholder="https://pashalawsenate.com"
+            />
+          </label>
+          <label className="space-y-2 text-sm">
+            <span className="block font-medium text-slate-600 dark:text-slate-300">Office address</span>
+            <input
+              name="address"
+              className="input"
+              value={profileForm.address}
+              onChange={handleProfileChange}
+              placeholder="123 Legal Avenue, Suite 400"
+            />
+          </label>
+          <label className="space-y-2 text-sm md:col-span-2">
+            <span className="block font-medium text-slate-600 dark:text-slate-300">Notes</span>
+            <textarea
+              name="notes"
+              className="input min-h-[90px]"
+              value={profileForm.notes}
+              onChange={handleProfileChange}
+              placeholder="Reception hours, parking guidance, or meeting preferences"
+            />
+          </label>
+          <div className="md:col-span-2 flex items-center justify-between text-xs text-slate-500">
+            {profile.updatedAt ? (
+              <span>
+                Last updated {dayjs(profile.updatedAt).format('DD MMM YYYY, h:mm A')}
+              </span>
+            ) : (
+              <span>Fill in your firm information so it appears across the portal.</span>
+            )}
+            <button type="submit" className="btn btn-primary" disabled={isSavingProfile}>
+              {isSavingProfile ? 'Saving…' : 'Save profile'}
+            </button>
+          </div>
+        </form>
+      </section>
+
       <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         {statCards.map((card) => (
           <article key={card.key} className="card p-5">

@@ -96,6 +96,11 @@ export const api = {
       method: 'PUT',
       body: JSON.stringify(payload),
     }),
+  updateProfile: (payload) =>
+    request('/api/profile', {
+      method: 'PUT',
+      body: JSON.stringify(payload),
+    }),
   updateStats: (stats) =>
     request('/api/portal/stats', {
       method: 'PUT',

@@ -14,13 +14,48 @@ npm install
 npm --prefix server install
 ```
 
+## What to do next (quick start)
+Follow this checklist the first time you run the project locally:
+
+1. **Copy the environment file** – Duplicate `server/.env.example` to `server/.env` and adjust any values (for example, change
+   the admin password before inviting teammates).
+2. **Seed the database** – Run `npm run api:init-db` once. This creates the SQLite file at
+   `server/data/pasha-law-senate.db` with the default portal content.
+3. **Start the backend** – Launch the Express API with `npm run api:dev`. Leave this terminal running so the client can reach
+   the database.
+4. **Start the frontend** – In a new terminal, execute `npm run dev` to open the React app at `http://localhost:5173`.
+5. **Log in and enter your data** – Visit the dashboard, update the firm profile, and add cases, clients, hearings, resources,
+   and support desks. Every change is written to SQLite through the API and will still be there after restarting the servers.
+6. **Verify persistence (optional)** – Open `sqlite3 server/data/pasha-law-senate.db` in another terminal and run `.tables` or
+   `SELECT * FROM cases;` to confirm your entries exist.
+
+You can repeat steps 3 and 4 on future sessions—there is no need to re-initialise the database unless you want to reset the
+content.
+
 ## Backend configuration
 1. Copy `server/.env.example` to `server/.env` and adjust values if required. The defaults provision an administrator account at `admin@pashalawsenate.com` with the password `changeMe123` and allow requests from `http://localhost:5173`.
-2. Start the API:
+2. Initialise the local SQLite database (this creates `server/data/pasha-law-senate.db` on disk):
    ```bash
+   npm run api:init-db
+   # or
+   npm --prefix server run db:init
+   ```
+3. Start the API:
+   ```bash
+   npm run api:dev
+   # or
    npm --prefix server run dev
    ```
    The server listens on the configured `PORT` (4000 by default) and stores its SQLite database in `server/data/pasha-law-senate.db`.
+
+### Inspecting the database from the terminal
+After running `npm run api:init-db` (or once the API has started at least once) you can inspect the stored data with any SQLite client. For example, using the CLI that ships with SQLite:
+
+```bash
+sqlite3 server/data/pasha-law-senate.db
+```
+
+Inside the shell you can list tables with `.tables` or query data (e.g. `SELECT * FROM cases;`). Type `.exit` to leave the prompt when you're done.
 
 ### Docker deployment
 The `server/Dockerfile` packages the Express API with the SQLite CLI and the build toolchain required for the `better-sqlite3` dependency. Build and run the container from the repository root:
@@ -63,7 +98,7 @@ npm run build
 This command compiles the React application into static assets under `dist/`.
 
 ## API reference
-The backend exposes REST endpoints under `/api` for authentication, metrics, cases, clients, tasks, team contacts, resources, and support desks. See `server/src/server.js` for the full route list.
+The backend exposes REST endpoints under `/api` for authentication, the firm profile, metrics, cases, clients, tasks, team contacts, resources, and support desks. See `server/src/server.js` for the full route list.
 
 ## Database internals
 The Express API persists all portal data to a SQLite database located at `server/data/pasha-law-senate.db` by default (or the path
@@ -71,6 +106,7 @@ provided via `DATABASE_PATH`). The schema is managed in `server/src/database.js`
 
 - `users` & `sessions` – store staff credentials with salted+hashed passwords and active session tokens.
 - `stats` – key/value metrics for dashboard KPIs such as active matters, hearings this week, pending filings, and team utilisation.
+- `firm_profile` – stores the firm’s name, contact channels, office address, and reference notes shown across the portal.
 - `cases`, `clients`, `tasks`, `team_members`, `resources`, `support_desks` – structured records for the operational data that powers
   each portal page.
 
